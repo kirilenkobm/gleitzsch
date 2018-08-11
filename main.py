@@ -9,6 +9,8 @@ import numpy as np
 from skimage import io
 from skimage import img_as_float
 from skimage import transform as tf
+from skimage import exposure
+from modules.filters import adjust_contrast, rb_shift, glitter, make_rainbow
 
 
 def eprint(line, end="\n"):
@@ -29,9 +31,20 @@ def parse_args():
     app.add_argument("output", type=str, help="Output file.")
     app.add_argument("--size", type=int, default=800, help="Long dimension, 800 as default.")
     app.add_argument("--temp_dir", type=str, default="temp", help="Directory to hold temp files.")
+    app.add_argument("--blue_red_shift", "-b", type=int, default=16, help="use red/blue shift")
+    app.add_argument("--shift", type=int, default=227, help="Horizontal shift correction, pixels.")
+    app.add_argument("--gamma", "-g", type=float, default=0.5,
+                     help="Gamma correction before mp3-ing. 0.5 as default.")
+    app.add_argument("--right_pecrentile", "-r", type=int, default=98,
+                     help="Contrast stretching, right percentile, 90 as default. "
+                          "Int in range [left percentile..100]")
+    app.add_argument("--left_pecrentile", "-l", type=int, default=2,
+                     help="Contrast stretching, left percentile, 2 as default. "
+                          "Int in range [0..right_percentile]")
     args = app.parse_args()
     # create temp dir if not exists
     os.mkdir(args.temp_dir) if not os.path.isdir(args.temp_dir) else None
+    # TODO check if r_b is an even number
     return args
 
 
@@ -57,7 +70,7 @@ def der_prozess(cmd):
     eprint("Calling {0}".format(cmd))
     rc = subprocess.call(cmd, shell=True)
     if rc != 0:  # subprocess died
-        die("Error! Command {0} failed.")
+        die("Error! Command {0} failed.".format(cmd))
 
 
 def process_channel(channel, temp_dir):
@@ -75,7 +88,7 @@ def process_channel(channel, temp_dir):
 
     # compress as mp3
     mp3_addr = os.path.join(temp_dir, "img.mp3")
-    mp3_cmd = 'lame -r -s 32 -q 9 -m j --resample 32 --bitwidth 8 -b 4 -m m $* {0} "{1}"'.format(gray_file, mp3_addr)
+    mp3_cmd = 'lame -r -s 32 -q 9 -m j --resample 32 --bitwidth 8 -b 1 -m m $* {0} "{1}"'.format(gray_file, mp3_addr)
     der_prozess(mp3_cmd)
 
     # decode mp3 to a raw bytes file
@@ -109,10 +122,22 @@ def main():
     t0 = dt.now()
     args = parse_args()
     im = read_image(args.input, args.size)  # read image
+    # correct gamma before mp3-ing
+    im = exposure.adjust_gamma(image=im, gain=args.gamma)
+    # split in channels and mp3 them separately
     red, green, blue = im[:, :, 0], im[:, :, 1], im[:, :, 2]
     mp3d_chan = [process_channel(channel, args.temp_dir) for channel in [red, green, blue]]
     mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
-    io.imsave(fname=args.output, arr=mp3d_im)
+    # correct shift
+    mp3d_im = np.roll(a=mp3d_im, axis=1, shift=args.shift)
+    # mp3 processing dramatically decreases contrast, let's increase it before the processing:
+    im = adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
+    # apply aberration if required
+    im = rb_shift(im, args.blue_red_shift) if args.blue_red_shift > 0 else im
+    # apply rainbow
+    im = make_rainbow(im)
+    # save img
+    io.imsave(fname=args.output, arr=im)
     eprint("Estimated time: {0}".format(dt.now() - t0))
 
 
