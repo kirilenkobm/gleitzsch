@@ -11,6 +11,8 @@ from skimage import img_as_float
 from skimage import transform as tf
 from skimage import exposure
 from modules.filters import adjust_contrast, rb_shift, glitter, make_rainbow
+from modules.bytes_glitch import glitch_bytes
+from modules.process_mp3 import process_mp3
 
 
 def eprint(line, end="\n"):
@@ -41,6 +43,8 @@ def parse_args():
     app.add_argument("--left_pecrentile", "-l", type=int, default=2,
                      help="Contrast stretching, left percentile, 2 as default. "
                           "Int in range [0..right_percentile]")
+    app.add_argument("--proc_sound", action="store_true", dest="proc_sound", help="Glitch at the mp3 sound level.")
+    app.add_argument("--bytes", action="store_true", dest="bytes", help="Glitch at the image bytes level.")
     args = app.parse_args()
     # create temp dir if not exists
     os.mkdir(args.temp_dir) if not os.path.isdir(args.temp_dir) else None
@@ -73,7 +77,7 @@ def der_prozess(cmd):
         die("Error! Command {0} failed.".format(cmd))
 
 
-def process_channel(channel, temp_dir):
+def process_channel(channel, num, temp_dir, proc_sound):
     """Process channel through mp3 converter."""
     temp_file = os.path.join(temp_dir, "initial_file.jpg")
     io.imsave(fname=temp_file, arr=channel)
@@ -88,8 +92,11 @@ def process_channel(channel, temp_dir):
 
     # compress as mp3
     mp3_addr = os.path.join(temp_dir, "img.mp3")
-    mp3_cmd = 'lame -r -s 32 -q 9 -m j --resample 32 --bitwidth 8 -b 1 -m m $* {0} "{1}"'.format(gray_file, mp3_addr)
+    mp3_cmd = 'lame -r -s 32 -q 9 -m j --resample 32 --bitwidth 8 -b 8 -m m $* {0} "{1}"'.format(gray_file, mp3_addr)
     der_prozess(mp3_cmd)
+
+    # modify the mp3
+    process_mp3(mp3_addr, dimensions, chan_num=num) if proc_sound else None
 
     # decode mp3 to a raw bytes file
     decode_cmd = 'lame --decode -x -t "{0}" {1}'.format(mp3_addr, gray_file)
@@ -121,12 +128,15 @@ def main():
     """Main func."""
     t0 = dt.now()
     args = parse_args()
+    # pre-process the image if required
+    glitch_bytes(args.input) if args.bytes else None
     im = read_image(args.input, args.size)  # read image
     # correct gamma before mp3-ing
     im = exposure.adjust_gamma(image=im, gain=args.gamma)
     # split in channels and mp3 them separately
     red, green, blue = im[:, :, 0], im[:, :, 1], im[:, :, 2]
-    mp3d_chan = [process_channel(channel, args.temp_dir) for channel in [red, green, blue]]
+    mp3d_chan = [process_channel(channel, num, args.temp_dir, args.proc_sound)
+                 for num, channel in enumerate([red, green, blue])]
     mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
     # correct shift
     mp3d_im = np.roll(a=mp3d_im, axis=1, shift=args.shift)
@@ -135,10 +145,11 @@ def main():
     # apply aberration if required
     im = rb_shift(im, args.blue_red_shift) if args.blue_red_shift > 0 else im
     # apply rainbow
-    im = make_rainbow(im)
+    # im = make_rainbow(im)
     # save img
     io.imsave(fname=args.output, arr=im)
     eprint("Estimated time: {0}".format(dt.now() - t0))
+    sys.exit(0)
 
 
 if __name__ == "__main__":
