@@ -82,8 +82,9 @@ def process_channel(channel, num, temp_dir, proc_sound):
     temp_file = os.path.join(temp_dir, "initial_file.jpg")
     io.imsave(fname=temp_file, arr=channel)
     # get dimensions
-    dim_cmd = """identify "{0}" | tr ' ' '\n' | egrep '[0-9]+x[0-9]+' | head -1 | tr x ' '""".format(temp_file)
-    dimensions = subprocess.check_output(dim_cmd, shell=True).decode(encoding='utf-8')[:-1]
+    dim_cmd = 'identify "{0}"'.format(temp_file)
+    dimensions_raw = subprocess.check_output(dim_cmd, shell=True).decode(encoding="utf-8")
+    dimensions = dimensions_raw.split()[2].replace("x", " ")
 
     # convert to a raw bytes file
     gray_file = os.path.join(temp_dir, "img.gray")
