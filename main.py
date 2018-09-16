@@ -68,6 +68,7 @@ def parse_args():
                           "Int in range [0..right_percentile]")
     app.add_argument("--proc_sound", action="store_true", dest="proc_sound", help="Glitch at the mp3 sound level.")
     app.add_argument("--bytes", action="store_true", dest="bytes", help="Glitch at the image bytes level.")
+    app.add_argument("--vertical", action="store_true", dest="vertical", help="Vertical lines.")
     app.add_argument("--kHz", type=float, default=16)
     args = app.parse_args()
     # create temp dir if not exists
@@ -160,17 +161,27 @@ def process_channel(channel, shape, temp_dir, khz):
     return glitched
 
 
+def add_vertical(image):
+    """Hard to say."""
+    first_row = np.reshape(image[0, :, :], newshape=(1, image.shape[1], image.shape[2]))
+    stretch = np.repeat(first_row, image.shape[0], axis=0)
+    add = image + stretch / 10
+    add[add > 1] = 1.0
+    return add
+
+
 def main():
     """Main func."""
     t0 = dt.now()
     args = parse_args()
-    if args.bytes:
+    if args.bytes:  # apply glitch to bytes
         temp_bytes = os.path.join(args.temp_dir, "bytes_{0}.jpg".format(id_gen()))
         temp_files.append(temp_bytes)
         glitch_bytes(args.input, temp_bytes)
         im_addr = temp_bytes
-    else:
+    else:  # is not required
         im_addr = args.input
+    # read image, preprocess it
     im, shape = read_image(im_addr, args.size)  # read image
     gamma = args.gamma if args.gamma else auto_gamma(im)
     im = exposure.adjust_gamma(image=im, gain=gamma)
@@ -179,6 +190,8 @@ def main():
     red, green, blue = im[:, :, 0], im[:, :, 1], im[:, :, 2]
     mp3d_chan = [process_channel(channel, shape, args.temp_dir, args.kHz) for channel in [red, green, blue]]
     mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
+    # stretch vertical bands if requred
+    mp3d_im = add_vertical(mp3d_im) if args.vertical else mp3d_im
     # correct contrast + misc postprocess
     im = adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
     # correct shift
