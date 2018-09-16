@@ -12,6 +12,7 @@ from skimage import io
 from skimage import img_as_float
 from skimage import transform as tf
 from skimage import exposure
+import imageio
 from modules.filters import adjust_contrast, rb_shift, glitter, make_rainbow
 from modules.bytes_glitch import glitch_bytes
 
@@ -49,11 +50,11 @@ def parse_args():
     app = argparse.ArgumentParser()
     app.add_argument("input", type=str, help="Input image.")
     app.add_argument("output", type=str, help="Output file.")
-    app.add_argument("--size", type=int, default=800, help="Long dimension, 800 as default.")
+    app.add_argument("--size", type=int, default=420, help="Long dimension, 800 as default.")
     app.add_argument("--temp_dir", type=str, default="temp", help="Directory to hold temp files.")
-    app.add_argument("--blue_red_shift", "-b", type=int, default=0, help="use red/blue shift")
-    app.add_argument("--shift", type=int, default=230, help="Horizontal shift correction, pixels.")
-    app.add_argument("--gamma", "-g", type=float, default=None,
+    app.add_argument("--blue_red_shift", "-b", type=int, default=16, help="use red/blue shift")
+    app.add_argument("--shift", type=int, default=280, help="Horizontal shift correction, pixels.")
+    app.add_argument("--gamma", "-g", type=float, default=0.6,
                      help="Gamma correction before mp3-ing. 0.5 as default.")
     app.add_argument("--right_pecrentile", "-r", type=int, default=95,
                      help="Contrast stretching, right percentile, 90 as default. "
@@ -88,13 +89,6 @@ def read_image(input, size):
     new_h = int(matrix.shape[1] / scale_k)
     im = tf.resize(image=matrix, output_shape=(new_w, new_h))
     return im, (new_w, new_h)
-
-
-def auto_gamma(im):
-    """Return the most suitable gamma for this situation."""
-    # TODO
-    print(np.median(im))
-    return 0.4
 
 
 def der_prozess(cmd):
@@ -167,22 +161,26 @@ def main():
     else:
         im_addr = args.input
     im, shape = read_image(im_addr, args.size)  # read image
-    gamma = args.gamma if args.gamma else auto_gamma(im)
-    im = exposure.adjust_gamma(image=im, gain=gamma)
+    im = exposure.adjust_gamma(image=im, gain=args.gamma)
     im = rb_shift(im, args.blue_red_shift) if args.blue_red_shift > 0 else im
     # split in channels and mp3 them separately | concat channels back
     red, green, blue = im[:, :, 0], im[:, :, 1], im[:, :, 2]
-    mp3d_chan = [process_channel(channel, shape, args.temp_dir, args.kHz) for channel in [red, green, blue]]
-    mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
-    # correct contrast + misc postprocess
-    im = adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
-    # correct shift
-    im = np.roll(a=im, axis=1, shift=args.shift)
-    # save img
-    io.imsave(fname=args.output, arr=im)
+    gif_frames = []  # list for gif frames
+    for kHz in np.linspace(10, 16, num=19):
+        # create 19 frames
+        mp3d_chan = [process_channel(channel, shape, args.temp_dir, kHz) for channel in [red, green, blue]]
+        mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
+        # correct contrast + misc postprocess
+        im = adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
+        # correct shift
+        im = np.roll(a=im, axis=1, shift=args.shift)
+        gif_frames.append(im)
+        if kHz == 16 or kHz == 8:
+            gif_frames.extend([im, im, im])
     # remove temp files
     for tfile in temp_files:
         os.remove(tfile) if os.path.isfile(tfile) else None
+    imageio.mimsave(args.output, gif_frames)
     eprint("Estimated time: {0}".format(dt.now() - t0))
     sys.exit(0)
 

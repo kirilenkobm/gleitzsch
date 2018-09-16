@@ -11,7 +11,7 @@ def jpeg_header(bytez):
     return result
 
 
-def glitch_bytes(image_file, amount_percent=0.3, seed_percent=0.5, iteration_count=9):
+def glitch_bytes(image_file, output_file, amount_percent=0.3, seed_percent=0.5, iteration_count=9):
     """Glitch an image at the level of the file structure."""
     with open(image_file, "rb") as f:
         content = bytearray(f.read())
@@ -31,5 +31,5 @@ def glitch_bytes(image_file, amount_percent=0.3, seed_percent=0.5, iteration_cou
         content[indexInByteArray] = ~~int((amount_percent * 255))
 
     bytez_str = bytes(content)
-    with open(image_file, "wb") as f:
+    with open(output_file, "wb") as f:
         f.write(bytez_str)
