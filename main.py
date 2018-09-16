@@ -5,14 +5,18 @@ import sys
 import os
 from datetime import datetime as dt
 import subprocess
+import string
+import random
 import numpy as np
 from skimage import io
 from skimage import img_as_float
 from skimage import transform as tf
 from skimage import exposure
 from modules.filters import adjust_contrast, rb_shift, glitter, make_rainbow
-from modules.bytes_glitch import glitch_bytes
-from modules.process_mp3 import process_mp3
+
+
+__author__ = "Bogdan Kirilenko, 2018"
+__version__ = 2.0
 
 
 def eprint(line, end="\n"):
@@ -26,6 +30,16 @@ def die(msg, rc=1):
     sys.exit(rc)
 
 
+def id_gen(size=6, chars=string.ascii_uppercase + string.digits):
+    """Return random string for temp files."""
+    return "".join(random.choice(chars) for _ in range(size))
+
+
+def parts(lst, n=25):
+    """Split an iterable into a list of lists of len n."""
+    return [lst[i:i + n] for i in iter(range(0, len(lst), n))]
+
+
 def parse_args():
     """Parse and check args."""
     app = argparse.ArgumentParser()
@@ -34,17 +48,18 @@ def parse_args():
     app.add_argument("--size", type=int, default=800, help="Long dimension, 800 as default.")
     app.add_argument("--temp_dir", type=str, default="temp", help="Directory to hold temp files.")
     app.add_argument("--blue_red_shift", "-b", type=int, default=16, help="use red/blue shift")
-    app.add_argument("--shift", type=int, default=227, help="Horizontal shift correction, pixels.")
-    app.add_argument("--gamma", "-g", type=float, default=0.5,
+    app.add_argument("--shift", type=int, default=230, help="Horizontal shift correction, pixels.")
+    app.add_argument("--gamma", "-g", type=float, default=0.6,
                      help="Gamma correction before mp3-ing. 0.5 as default.")
-    app.add_argument("--right_pecrentile", "-r", type=int, default=98,
+    app.add_argument("--right_pecrentile", "-r", type=int, default=90,
                      help="Contrast stretching, right percentile, 90 as default. "
                           "Int in range [left percentile..100]")
-    app.add_argument("--left_pecrentile", "-l", type=int, default=2,
+    app.add_argument("--left_pecrentile", "-l", type=int, default=8,
                      help="Contrast stretching, left percentile, 2 as default. "
                           "Int in range [0..right_percentile]")
     app.add_argument("--proc_sound", action="store_true", dest="proc_sound", help="Glitch at the mp3 sound level.")
     app.add_argument("--bytes", action="store_true", dest="bytes", help="Glitch at the image bytes level.")
+    app.add_argument("--kHz", type=float, default=16.0)
     args = app.parse_args()
     # create temp dir if not exists
     os.mkdir(args.temp_dir) if not os.path.isdir(args.temp_dir) else None
@@ -65,87 +80,87 @@ def read_image(input, size):
         die("Image is corrupted.")
     # rescale the image
     scale_k = max(matrix.shape[0], matrix.shape[1]) / size
-    im = tf.resize(image=matrix, output_shape=(int(matrix.shape[0] / scale_k), int(matrix.shape[1] / scale_k)))
-    return im
+    new_w = int(matrix.shape[0] / scale_k)
+    new_h = int(matrix.shape[1] / scale_k)
+    im = tf.resize(image=matrix, output_shape=(new_w, new_h))
+    return im, (new_w, new_h)
 
 
 def der_prozess(cmd):
     """Run process, die if fails."""
     eprint("Calling {0}".format(cmd))
-    rc = subprocess.call(cmd, shell=True)
+    devnull = open(os.devnull, 'w')
+    rc = subprocess.call(cmd, shell=True, stderr=devnull)
+    devnull.close()
     if rc != 0:  # subprocess died
         die("Error! Command {0} failed.".format(cmd))
 
 
-def process_channel(channel, num, temp_dir, proc_sound):
+def process_channel(channel, shape, temp_dir, kHz):
     """Process channel through mp3 converter."""
-    temp_file = os.path.join(temp_dir, "initial_file.jpg")
-    io.imsave(fname=temp_file, arr=channel)
-    # get dimensions
-    dim_cmd = """identify "{0}" | tr ' ' '\n' | egrep '[0-9]+x[0-9]+' | head -1 | tr x ' '""".format(temp_file)
-    dimensions = subprocess.check_output(dim_cmd, shell=True).decode(encoding='utf-8')[:-1]
+    channel_flat = np.reshape(channel, newshape=(shape[0] * shape[1]))
+    # transform to 0 - 255 array of integers
+    int_form = np.around(channel_flat * 255, decimals=0)
+    int_form[int_form > 255] = 255
+    int_form[int_form < 0] = 0
+    pseudo_bytes = bytearray(map(int, int_form))
+    eprint("Raw array of len {0} and shape {1}".format(len(pseudo_bytes), shape))
 
-    # convert to a raw bytes file
-    gray_file = os.path.join(temp_dir, "img.gray")
-    convert_cmd = 'convert "{0}" {1}'.format(temp_file, gray_file)
-    der_prozess(convert_cmd)
+    # define temp files
+    raw_channel = os.path.join(temp_dir, "init_{0}.jpg".format(id_gen()))
+    mp3_compressed = os.path.join(temp_dir, "compr_{0}.mp3".format(id_gen()))
+    mp3_decompressed = os.path.join(temp_dir, "decompr_{0}.mp3".format(id_gen()))
 
-    # compress as mp3
-    mp3_addr = os.path.join(temp_dir, "img.mp3")
-    mp3_cmd = 'lame -r -s 32 -q 9 -m j --resample 32 --bitwidth 8 -b 8 -m m $* {0} "{1}"'.format(gray_file, mp3_addr)
-    der_prozess(mp3_cmd)
+    # define commands
+    mp3_compr = 'lame -r --unsigned -s {0} -q 9 -m j --resample 16 --bitwidth 8 -b 12 -m m $* {1} "{2}"'\
+        .format(kHz, raw_channel, mp3_compressed)
+    mp3_decompr = 'lame --decode -x -t "{0}" {1}'.format(mp3_compressed, mp3_decompressed)
 
-    # modify the mp3
-    process_mp3(mp3_addr, dimensions, chan_num=num) if proc_sound else None
+    # write initial file | raw image
+    with open(raw_channel, "wb") as f:
+        f.write(pseudo_bytes)
 
-    # decode mp3 to a raw bytes file
-    decode_cmd = 'lame --decode -x -t "{0}" {1}'.format(mp3_addr, gray_file)
-    der_prozess(decode_cmd)
+    # call lame
+    der_prozess(mp3_compr)  # compress
+    der_prozess(mp3_decompr)  # decompress
 
-    # restore the image
-    pgm_addr = os.path.join(temp_dir, "img.pgm")
-    restore_cmd = r"python restore_cmd.py {0} < {1} > {2}".format(dimensions, gray_file, pgm_addr)
-    der_prozess(restore_cmd)
+    # read decompressed file | get raw sequence
+    with open(mp3_decompressed, "rb") as f:
+        mp3_bytes = f.read()
+    eprint("Decompressed array of len {0}".format(len(mp3_bytes)))
+    proportion = len(mp3_bytes) // len(pseudo_bytes)
+    eprint("Proportion {0}".format(proportion))
+    bytes_num = len(pseudo_bytes) * proportion
+    decompressed = mp3_bytes[:bytes_num]
 
-    # convert into a readable format
-    png_addr = os.path.join(temp_dir, "img.png")
-    png_cmd = 'convert {0} "{1}"'.format(pgm_addr, png_addr)
-    der_prozess(png_cmd)
-
-    # load the result
-    new_channel = io.imread(png_addr)
-    x, y = new_channel.shape[0], new_channel.shape[1]
-    new_channel = np.resize(new_channel, (x, y, 1))
-
+    # get average of each bytes pair / return 0..1 range of values | return initial shape
+    # glitched = np.array([(sum(pair) / proportion) / 255 for pair in parts(decompressed, n=proportion)])
+    glitched = np.array([pair[0] / 255 for pair in parts(decompressed, n=proportion)])
+    glitched = np.reshape(glitched, newshape=(shape[0], shape[1], 1))
+    # just in case
+    glitched[glitched > 1] = 1.0
+    glitched[glitched < 0] = 0.0
     # remove temp files
-    temp_files = [temp_file, gray_file, mp3_addr, pgm_addr, png_addr]
+    temp_files = [raw_channel, mp3_compressed, mp3_decompressed]
     for tfile in temp_files:
         os.remove(tfile) if os.path.isfile(tfile) else None
-    return new_channel
+    return glitched
 
 
 def main():
     """Main func."""
     t0 = dt.now()
     args = parse_args()
-    # pre-process the image if required
-    glitch_bytes(args.input) if args.bytes else None
-    im = read_image(args.input, args.size)  # read image
-    # correct gamma before mp3-ing
+    im, shape = read_image(args.input, args.size)  # read image
     im = exposure.adjust_gamma(image=im, gain=args.gamma)
-    # split in channels and mp3 them separately
+    # split in channels and mp3 them separately | concat channels back
     red, green, blue = im[:, :, 0], im[:, :, 1], im[:, :, 2]
-    mp3d_chan = [process_channel(channel, num, args.temp_dir, args.proc_sound)
-                 for num, channel in enumerate([red, green, blue])]
+    mp3d_chan = [process_channel(channel, shape, args.temp_dir, args.kHz) for channel in [red, green, blue]]
     mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
-    # correct shift
-    mp3d_im = np.roll(a=mp3d_im, axis=1, shift=args.shift)
-    # mp3 processing dramatically decreases contrast, let's increase it before the processing:
+    # correct contrast + misc postprocess
     im = adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
-    # apply aberration if required
-    im = rb_shift(im, args.blue_red_shift) if args.blue_red_shift > 0 else im
-    # apply rainbow
-    # im = make_rainbow(im)
+    # correct shift
+    im = np.roll(a=im, axis=1, shift=args.shift)
     # save img
     io.imsave(fname=args.output, arr=im)
     eprint("Estimated time: {0}".format(dt.now() - t0))
