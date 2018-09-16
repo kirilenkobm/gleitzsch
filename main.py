@@ -19,6 +19,11 @@ from modules.bytes_glitch import glitch_bytes
 __author__ = "Bogdan Kirilenko, 2018"
 __version__ = 2.0
 temp_files = []
+# where the lame binary actually is
+if os.name == "nt":  # windows
+    LAME_BINARY = r".\lame.exe"
+else:  # using linux/macos
+    LAME_BINARY = "lame"
 
 
 def eprint(line, end="\n"):
@@ -124,9 +129,9 @@ def process_channel(channel, shape, temp_dir, khz):
     temp_files.extend([raw_channel, mp3_compressed, mp3_decompressed])
 
     # define commands
-    mp3_compr = 'lame -r --unsigned -s {0} -q 9 --resample 18 --bitwidth 8 -b 12 -m m $* {1} "{2}"'\
-        .format(khz, raw_channel, mp3_compressed)
-    mp3_decompr = 'lame --decode -x -t "{0}" {1}'.format(mp3_compressed, mp3_decompressed)
+    mp3_compr = '{lame} -r --unsigned -s {0} -q 9 --resample 18 --bitwidth 8 -b 12 -m m {1} "{2}"'\
+        .format(khz, raw_channel, mp3_compressed, lame=LAME_BINARY)
+    mp3_decompr = '{lame} --decode -x -t "{0}" {1}'.format(mp3_compressed, mp3_decompressed, lame=LAME_BINARY)
 
     # write initial file | raw image
     with open(raw_channel, "wb") as f:
