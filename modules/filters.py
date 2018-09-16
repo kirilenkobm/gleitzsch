@@ -47,7 +47,7 @@ def glitter(im, alen=250):
 
     for dot in dots:
         try:
-            im[dot[0] - 1: dot[0], dot[1] - 3: dot[1] + 3, :] = -1
+            im[dot[0] - 1: dot[0], dot[1] - 3: dot[1] + 3, :] = 1
         except IndexError:
             pass
 
