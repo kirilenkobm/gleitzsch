@@ -12,7 +12,6 @@ from skimage import io
 from skimage import img_as_float
 from skimage import transform as tf
 from skimage import exposure
-from skimage import color
 from modules.filters import adjust_contrast, rb_shift, glitter, make_rainbow
 from modules.bytes_glitch import glitch_bytes
 
@@ -68,9 +67,10 @@ def parse_args():
                      help="Contrast stretching, left percentile, 2 as default. "
                           "Int in range [0..right_percentile]")
     app.add_argument("--bytes", action="store_true", dest="bytes", help="Glitch at the image bytes level.")
+    app.add_argument("--interlacing", "-i", action="store_true", dest="interlacing", help="Interlacing")
     app.add_argument("--vertical", action="store_true", dest="vertical", help="Vertical lines.")
     app.add_argument("--kHz", type=float, default=16)
-    app.add_argument("--bitrate", default=18, type=int, help="Mp3 bitrate.")
+    app.add_argument("--bitrate", default=16, type=int, help="Mp3 bitrate.")
     args = app.parse_args()
     # create temp dir if not exists
     os.mkdir(args.temp_dir) if not os.path.isdir(args.temp_dir) else None
@@ -162,6 +162,7 @@ def process_channel(channel, temp_dir, khz, bitrate):
     # just in case
     glitched[glitched > 1] = 1.0
     glitched[glitched < 0] = 0.0
+    io.imsave("wat.jpg", glitched)
     return glitched
 
 
@@ -213,6 +214,27 @@ def _process_channel(channel, shape, temp_dir, khz):
     return glitched
 
 
+def interlace(im):
+    """Add interlacing fields."""
+    w, h, d = im.shape
+    coeff, processed = 3, []
+    shift = 0
+
+    for num, i in enumerate(range(0, w, coeff)):
+        row = im[i: i + coeff + 1, :, :]
+        row = row / 1.05 if num % 2 == 0 else row
+        shift_p = np.random.choice([-2, -1, 0, 1, 2], 1, p=[0.025, 0.025, 0.9, 0.025, 0.025])[0]
+        shift += shift_p
+        row = np.roll(a=row, axis=0, shift=shift)
+        row = np.roll(a=row, axis=1, shift=shift)
+        # row = np.roll(a=row, axis=2, shift=shift_p)
+        processed.append(row)
+
+    merge = np.concatenate(processed, axis=0)
+    merge = tf.resize(merge, (w, h))
+    return merge
+
+
 def add_vertical(image):
     """Hard to say."""
     first_row = np.reshape(image[0, :, :], newshape=(1, image.shape[1], image.shape[2]))
@@ -244,9 +266,10 @@ def main():
     # mp3d_chan = [process_channel(channel, shape, args.temp_dir, args.kHz) for channel in [red, green, blue]]
     # mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
     mp3d_im = process_channel(im, args.temp_dir, args.kHz, args.bitrate)
+    mp3d_im = mp3d_im if not args.interlacing else interlace(mp3d_im)
     # stretch vertical bands if requred
     mp3d_im = add_vertical(mp3d_im) if args.vertical else mp3d_im
-    mp3d_im = rb_shift(mp3d_im, args.blue_red_shift) if args.blue_red_shift > 0 else im
+    mp3d_im = rb_shift(mp3d_im, args.blue_red_shift) if args.blue_red_shift > 0 else mp3d_im
     # correct contrast + misc postprocess
     im = adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
     # correct shift
