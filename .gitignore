@@ -1,2 +1,4 @@
 .idea/*
 modules/__pycache__/*
+test/*
+output/*
