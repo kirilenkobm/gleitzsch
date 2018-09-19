@@ -21,7 +21,7 @@ app.secret_key = os.urandom(64)
 def glitch_it(input_image, params):
     temp_name = str(random.randint(1000000, 9999999)) + '.jpg'
     temp_path = os.path.join(TEMP, temp_name)
-    glitch_cmd = "{0} main.py {1} {2}".format(sys.executable, input_image, temp_path)
+    glitch_cmd = "{0} gleitzsch.py {1} {2}".format(sys.executable, input_image, temp_path)
     # add params if required
     glitch_cmd = glitch_cmd + " -g {0}".format(params["gamma"]) if params["gamma"] else glitch_cmd
     glitch_cmd = glitch_cmd + " -b {0}".format(params["blue_red"]) if params["blue_red"] else glitch_cmd
