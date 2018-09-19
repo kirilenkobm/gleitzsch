@@ -12,7 +12,7 @@ from skimage import io
 from skimage import img_as_float
 from skimage import transform as tf
 from skimage import exposure
-from modules.filters import adjust_contrast, rb_shift, glitter, make_rainbow
+from modules.filters import adjust_contrast, xyz_shift, rgb_shift
 from modules.bytes_glitch import glitch_bytes
 
 
@@ -223,11 +223,11 @@ def interlace(im):
     for num, i in enumerate(range(0, w, coeff)):
         row = im[i: i + coeff + 1, :, :]
         row = row / 1.05 if num % 2 == 0 else row
-        shift_p = np.random.choice([-2, -1, 0, 1, 2], 1, p=[0.025, 0.025, 0.9, 0.025, 0.025])[0]
+        shift_p = np.random.choice([-2, 0, 2], 1, p=[0.025, 0.95, 0.025])[0]
         shift += shift_p
-        row = np.roll(a=row, axis=0, shift=shift)
-        row = np.roll(a=row, axis=1, shift=shift)
-        # row = np.roll(a=row, axis=2, shift=shift_p)
+        row = np.roll(a=row, axis=0, shift=shift)  # small part
+        row = np.roll(a=row, axis=1, shift=shift)  # long size
+        row = np.roll(a=row, axis=2, shift=shift_p)  # color
         processed.append(row)
 
     merge = np.concatenate(processed, axis=0)
@@ -269,7 +269,7 @@ def main():
     mp3d_im = mp3d_im if not args.interlacing else interlace(mp3d_im)
     # stretch vertical bands if requred
     mp3d_im = add_vertical(mp3d_im) if args.vertical else mp3d_im
-    mp3d_im = rb_shift(mp3d_im, args.blue_red_shift) if args.blue_red_shift > 0 else mp3d_im
+    mp3d_im = rgb_shift(mp3d_im, args.blue_red_shift) if args.blue_red_shift > 0 else mp3d_im
     # correct contrast + misc postprocess
     im = adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
     # correct shift

@@ -14,7 +14,31 @@ def adjust_contrast(im, l_p, r_p):
     return im
 
 
-def rb_shift(img, kt):
+def xyz_shift(img, kt):
+    """Apply chromatic aberration."""
+    img = color.rgb2xyz(img)
+    shp = img.shape
+    red = img[:, :, 0]
+    green = img[:, :, 1]
+    blue = img[:, :, 2]
+    # split channels, make shift
+    red = tf.resize(red, output_shape=(shp[0], shp[1]))
+    green = tf.resize(green, output_shape=(shp[0] - kt, shp[1] - kt))
+    blue = tf.resize(blue, output_shape=(shp[0] - 2 * kt, shp[1] - 2 * kt))
+
+    w, h = blue.shape
+    ktd2 = int(kt / 2)
+    red_n = np.reshape(red[kt: -kt, kt: -kt], (w, h, 1))
+    green_n = np.reshape(green[ktd2: -1 * ktd2, ktd2: -1 * ktd2], (w, h, 1))
+    blue_n = np.reshape(blue[:, :], (w, h, 1))
+
+    new_im = np.concatenate((red_n, green_n, blue_n), axis=2)
+    new_im = tf.resize(new_im, (shp[0], shp[1]))
+    new_im = color.xyz2rgb(new_im)
+    return new_im
+
+
+def rgb_shift(img, kt):
     """Apply chromatic aberration."""
     shp = img.shape
     red = img[:, :, 0]

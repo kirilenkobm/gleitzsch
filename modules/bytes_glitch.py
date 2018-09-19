@@ -11,7 +11,7 @@ def jpeg_header(bytez):
     return result
 
 
-def glitch_bytes(image_file, output_file, amount_percent=0.3, seed_percent=0.5, iteration_count=9):
+def _glitch_bytes(image_file, output_file, amount_percent=0.3, seed_percent=0.5, iteration_count=9):
     """Glitch an image at the level of the file structure."""
     with open(image_file, "rb") as f:
         content = bytearray(f.read())
@@ -28,8 +28,36 @@ def glitch_bytes(image_file, output_file, amount_percent=0.3, seed_percent=0.5, 
         pixel_index = max_ind if pixel_index > max_ind else pixel_index
 
         indexInByteArray = ~~(header_length + pixel_index)
+        print(content[indexInByteArray])
         content[indexInByteArray] = ~~int((amount_percent * 255))
+        print(content[indexInByteArray])
 
     bytez_str = bytes(content)
+    with open(output_file, "wb") as f:
+        f.write(bytez_str)
+
+
+def glitch_bytes(input_file, output_file, amountPercent=0.3, seedPercent=0.5, iterationCount=9):
+    with open(input_file, 'rb') as f:
+        bytez = bytearray(f.read())
+
+    headerLength = jpeg_header(bytez)
+    maxInd = len(bytez) - headerLength - 4
+
+    for i in range(iterationCount):
+
+        minPixelIndex = int((maxInd / iterationCount * i)) | 0
+        maxPixelIndex = int((maxInd / iterationCount * (i + 1))) | 0
+        delta = maxPixelIndex - minPixelIndex
+        pixelIndex = int((minPixelIndex + delta * seedPercent)) | 0
+
+        if pixelIndex > maxInd:
+            pixelIndex = maxInd
+
+        indexInByteArray = ~~(headerLength + pixelIndex)
+        bytez[indexInByteArray] = ~~int((amountPercent * 255))
+
+    bytez_str = bytes(bytez)
+
     with open(output_file, "wb") as f:
         f.write(bytez_str)

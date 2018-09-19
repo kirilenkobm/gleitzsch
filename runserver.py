@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Run flask server."""
 from app import app
 
 if __name__ == '__main__':

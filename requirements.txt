@@ -1,0 +1,6 @@
+numpy
+scikit-image
+imageio
+flask
+werkzeug
+# lame installation

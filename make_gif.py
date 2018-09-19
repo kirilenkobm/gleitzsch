@@ -50,11 +50,11 @@ def parse_args():
     app = argparse.ArgumentParser()
     app.add_argument("input", type=str, help="Input image.")
     app.add_argument("output", type=str, help="Output file.")
-    app.add_argument("--size", type=int, default=420, help="Long dimension, 800 as default.")
+    app.add_argument("--size", type=int, default=360, help="Long dimension, 800 as default.")
     app.add_argument("--temp_dir", type=str, default="temp", help="Directory to hold temp files.")
     app.add_argument("--blue_red_shift", "-b", type=int, default=16, help="use red/blue shift")
-    app.add_argument("--shift", type=int, default=280, help="Horizontal shift correction, pixels.")
-    app.add_argument("--gamma", "-g", type=float, default=0.6,
+    app.add_argument("--shift", type=int, default=140, help="Horizontal shift correction, pixels.")
+    app.add_argument("--gamma", "-g", type=float, default=0.4,
                      help="Gamma correction before mp3-ing. 0.5 as default.")
     app.add_argument("--right_pecrentile", "-r", type=int, default=95,
                      help="Contrast stretching, right percentile, 90 as default. "
@@ -166,7 +166,7 @@ def main():
     # split in channels and mp3 them separately | concat channels back
     red, green, blue = im[:, :, 0], im[:, :, 1], im[:, :, 2]
     gif_frames = []  # list for gif frames
-    for kHz in np.linspace(10, 16, num=19):
+    for kHz in np.linspace(15, 17, num=19):
         # create 19 frames
         mp3d_chan = [process_channel(channel, shape, args.temp_dir, kHz) for channel in [red, green, blue]]
         mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
