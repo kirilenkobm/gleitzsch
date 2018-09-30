@@ -12,7 +12,7 @@ from skimage import io
 from skimage import img_as_float
 from skimage import transform as tf
 from skimage import exposure
-from modules.filters import adjust_contrast, xyz_shift, rgb_shift
+from modules.filters import adjust_contrast, rgb_shift, bayer, interlace, add_vertical
 from modules.bytes_glitch import glitch_bytes
 
 
@@ -60,6 +60,7 @@ def parse_args():
     app.add_argument("--shift", type=int, default=-200, help="Horizontal shift correction, pixels.")
     app.add_argument("--gamma", "-g", type=float, default=None,
                      help="Gamma correction before mp3-ing. 0.5 as default.")
+    app.add_argument("--bayer", action="store_true", dest="bayer", help="Apply Bayer filter.")
     app.add_argument("--right_pecrentile", "-r", type=int, default=95,
                      help="Contrast stretching, right percentile, 90 as default. "
                           "Int in range [left percentile..100]")
@@ -166,85 +167,6 @@ def process_channel(channel, temp_dir, khz, bitrate):
     return glitched
 
 
-def _process_channel(channel, shape, temp_dir, khz):
-    """Process channel through mp3 converter."""
-    channel_flat = np.reshape(channel, newshape=(shape[0] * shape[1]))
-    # transform to 0 - 255 array of integers
-    int_form = np.around(channel_flat * 255, decimals=0)
-    int_form[int_form > 255] = 255
-    int_form[int_form < 0] = 0
-    pseudo_bytes = bytearray(map(int, int_form))
-    eprint("Raw array of len {0} and shape {1}".format(len(pseudo_bytes), shape))
-
-    # define temp files | lame cannot work with stdin \ stdout
-    raw_channel = os.path.join(temp_dir, "init_{0}.blob".format(id_gen()))
-    mp3_compressed = os.path.join(temp_dir, "compr_{0}.mp3".format(id_gen()))
-    mp3_decompressed = os.path.join(temp_dir, "decompr_{0}.mp3".format(id_gen()))
-    temp_files.extend([raw_channel, mp3_compressed, mp3_decompressed])
-
-    # define commands
-    mp3_compr = '{lame} -r --unsigned -s {0} -q 9 --resample 16 --bitwidth 8 -b 8 -m m {1} "{2}"'\
-        .format(khz, raw_channel, mp3_compressed, lame=LAME_BINARY)
-    mp3_decompr = '{lame} --decode -x -t "{0}" {1}'.format(mp3_compressed, mp3_decompressed, lame=LAME_BINARY)
-
-    # write initial file | raw image
-    with open(raw_channel, "wb") as f:
-        f.write(pseudo_bytes)
-
-    # call lame
-    der_prozess(mp3_compr)  # compress
-    der_prozess(mp3_decompr)  # decompress
-
-    # read decompressed file | get raw sequence
-    with open(mp3_decompressed, "rb") as f:
-        mp3_bytes = f.read()
-    eprint("Decompressed array of len {0}".format(len(mp3_bytes)))
-    proportion = len(mp3_bytes) // len(pseudo_bytes)
-    eprint("Proportion {0}".format(proportion))
-    bytes_num = len(pseudo_bytes) * proportion
-    decompressed = mp3_bytes[:bytes_num]
-
-    # get average of each bytes pair / return 0..1 range of values | return initial shape
-    # glitched = np.array([(sum(pair) / proportion) / 255 for pair in parts(decompressed, n=proportion)])
-    glitched = np.array([pair[0] / 255 for pair in parts(decompressed, n=proportion)])
-    glitched = np.reshape(glitched, newshape=(shape[0], shape[1], 1))
-    # just in case
-    glitched[glitched > 1] = 1.0
-    glitched[glitched < 0] = 0.0
-    return glitched
-
-
-def interlace(im):
-    """Add interlacing fields."""
-    w, h, d = im.shape
-    coeff, processed = 3, []
-    shift = 0
-
-    for num, i in enumerate(range(0, w, coeff)):
-        row = im[i: i + coeff + 1, :, :]
-        row = row / 1.05 if num % 2 == 0 else row
-        shift_p = np.random.choice([-2, 0, 2], 1, p=[0.025, 0.95, 0.025])[0]
-        shift += shift_p
-        row = np.roll(a=row, axis=0, shift=shift)  # small part
-        row = np.roll(a=row, axis=1, shift=shift)  # long size
-        row = np.roll(a=row, axis=2, shift=shift_p)  # color
-        processed.append(row)
-
-    merge = np.concatenate(processed, axis=0)
-    merge = tf.resize(merge, (w, h))
-    return merge
-
-
-def add_vertical(image):
-    """Hard to say."""
-    first_row = np.reshape(image[0, :, :], newshape=(1, image.shape[1], image.shape[2]))
-    stretch = np.repeat(first_row, image.shape[0], axis=0)
-    # stretch[stretch > 0.95] = 0
-    add = image + stretch / 10
-    add[add > 1] = 1.0
-    return add
-
-
 def main():
     """Main func."""
     t0 = dt.now()
@@ -256,20 +178,23 @@ def main():
         im_addr = temp_bytes
     else:  # is not required
         im_addr = args.input
+
     # read image, preprocess it
     im, shape = read_image(im_addr, args.size)  # read image
     gamma = args.gamma if args.gamma else auto_gamma(im)
     im = exposure.adjust_gamma(image=im, gain=gamma)
-    # im = rb_shift(im, args.blue_red_shift) if args.blue_red_shift > 0 else im
+    im = im if not args.bayer else bayer(im)
+    im = im if not args.interlacing else interlace(im)
+    im = rgb_shift(im, args.blue_red_shift) if args.blue_red_shift > 0 else im
     # split in channels and mp3 them separately | concat channels back
     # red, green, blue = im[:, :, 0], im[:, :, 1], im[:, :, 2]
     # mp3d_chan = [process_channel(channel, shape, args.temp_dir, args.kHz) for channel in [red, green, blue]]
     # mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
     mp3d_im = process_channel(im, args.temp_dir, args.kHz, args.bitrate)
-    mp3d_im = mp3d_im if not args.interlacing else interlace(mp3d_im)
+    # mp3d_im = mp3d_im if not args.interlacing else interlace(mp3d_im)
     # stretch vertical bands if requred
     mp3d_im = add_vertical(mp3d_im) if args.vertical else mp3d_im
-    mp3d_im = rgb_shift(mp3d_im, args.blue_red_shift) if args.blue_red_shift > 0 else mp3d_im
+    # mp3d_im = rgb_shift(mp3d_im, args.blue_red_shift) if args.blue_red_shift > 0 else mp3d_im
     # correct contrast + misc postprocess
     im = adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
     # correct shift

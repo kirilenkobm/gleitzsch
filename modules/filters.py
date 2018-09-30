@@ -60,6 +60,26 @@ def rgb_shift(img, kt):
     return new_im
 
 
+def bayer(im):
+    """Apply bayer filter to the image."""
+    w, h, d = im.shape
+    for i in range(0, w, 2):
+        for j in range(0, h, 2):
+            # Looks like:
+            # G B
+            # R G
+            im[i, j][0], im[i, j][2] = 0.0, 0.0
+            im[i, j][1] /= 2.0
+            try:
+                im[i + 1, j][0], im[i + 1, j][1] = 0.0, 0.0
+                im[i, j + 1][1], im[i, j + 1][2] = 0.0, 0.0
+                im[i + 1, j + 1][0], im[i + 1, j + 1][2] = 0.0, 0.0
+                im[i + 1, j + 1][1] /= 2.0
+            except IndexError:
+                pass  # we are out of the array
+    return im
+
+
 def glitter(im, alen=250):
     """Make glitter."""
     dots = []
@@ -120,3 +140,41 @@ def make_rainbow(im):
     new_arr = rainbow_pic + im
     new_arr[new_arr > 1.0] = 1.0
     return new_arr
+
+
+def interlace(im):
+    """Add interlacing fields."""
+    w, h, d = im.shape
+    coeff, processed = 3, []
+    shift_wide = 2
+    zero_prob = 0.9
+    half_prob = 0.05
+    half_probs = [half_prob / shift_wide for _ in range(shift_wide)]
+    shift_probs = half_probs + [zero_prob] + half_probs
+    shif_pos = list(range(- shift_wide, shift_wide + 1))
+    shift = 0
+
+    for num, i in enumerate(range(0, w, coeff)):
+        row = im[i: i + coeff + 1, :, :]
+        row = row / 1.05 if num % 2 == 0 else row
+        shift_p = np.random.choice(shif_pos, 1, p=shift_probs)[0]
+        shift += shift_p
+        row = np.roll(a=row, axis=0, shift=shift)  # small part
+        row = np.roll(a=row, axis=1, shift=shift)  # long size
+        # row = np.roll(a=row, axis=2, shift=shift_p)  # color
+        processed.append(row)
+
+    merge = np.concatenate(processed, axis=0)
+    merge = tf.resize(merge, (w, h))
+    return merge
+
+
+def add_vertical(image):
+    """Hard to say."""
+    first_row = np.reshape(image[0, :, :], newshape=(1, image.shape[1], image.shape[2]))
+    stretch = np.repeat(first_row, image.shape[0], axis=0)
+    # stretch[stretch > 0.95] = 0
+    add = image + stretch / 10
+    add[add > 1] = 1.0
+    return add
+
