@@ -16,6 +16,7 @@ from skimage.draw import polygon
 from skimage import filters
 from modules.filters import adjust_contrast, rgb_shift, bayer, interlace, add_vertical, amplify
 from modules.bytes_glitch import glitch_bytes
+from modules.generate_abs import make_abs
 
 
 __author__ = "Bogdan Kirilenko, 2018"
@@ -194,6 +195,29 @@ def add_figs(im):
     return im
 
 
+def reconstruct(im, kHz):
+    """Reconstruct shifted rows."""
+    if kHz == 16.0:
+        return im
+    w, h, d = im.shape
+    processed = []
+    for num, i in enumerate(range(0, w, 1)):
+        row = im[i: i + 1, :, :]
+        if kHz == 16.01:
+            shift = int(num * 0.5)
+        elif kHz == 15.99:
+            shift = int(num * -0.5)
+        elif kHz == 15.98:
+            shift = int(num * -1)
+        else:
+            shift = 0
+        row = np.roll(a=row, axis=1, shift=shift)
+        processed.append(row)
+    merge = np.concatenate(processed, axis=0)
+    merge = tf.resize(merge, (w, h))
+    return merge
+
+
 def main():
     """Main func."""
     t0 = dt.now()
@@ -209,8 +233,12 @@ def main():
     # read image, preprocess it
     im, shape = read_image(im_addr, args.size)  # read image
     gamma = args.gamma if args.gamma else auto_gamma(im)
+    im = (im + make_abs(im.shape, skip_half=0, x_shift=80, red=False))
+    im[im > 1.0] = 1.0
+    im = add_figs(im) if args.figures else im
     im = exposure.adjust_gamma(image=im, gain=gamma)
     im = im if not args.bayer else bayer(im)
+    im = amplify(im) if args.amplify else im
     im = im if not args.interlacing else interlace(im)
     im = rgb_shift(im, args.blue_red_shift) if args.blue_red_shift > 0 else im
     # split in channels and mp3 them separately | concat channels back
@@ -226,7 +254,7 @@ def main():
     im = adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
     # correct shift
     im = np.roll(a=im, axis=1, shift=args.shift)
-    im = amplify(im) if args.amplify else im
+    im = reconstruct(im, args.kHz)
     # save img
     io.imsave(fname=args.output, arr=im)
     # remove temp files

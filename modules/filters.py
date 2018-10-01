@@ -60,7 +60,7 @@ def rgb_shift(img, kt):
     return new_im
 
 
-def _bayer(im):
+def __bayer(im):
     """Make monochrome pixels."""
     h, w, d = im.shape
     for i in range(h):
@@ -71,7 +71,7 @@ def _bayer(im):
     return im
 
 
-def bayer(im):
+def _bayer(im):
     """Apply bayer filter to the image."""
     w, h, d = im.shape
     for i in range(0, w, 2):
@@ -88,13 +88,36 @@ def bayer(im):
     return im
 
 
+def bayer(im):
+    """It is not a bayer filter anymore actually."""
+    w, h, d = im.shape
+    imlen = w * h * d
+    yes_not = np.random.choice([0, 1], imlen, p=[0.1, 0.9])
+    im_flat = np.reshape(im, imlen)
+    new_im_flat = [im_flat[i] if yes_not[i] == 1 else 0.0 for i in range(imlen)]
+    new_im = np.reshape(new_im_flat, (w, h, d))
+    return new_im
+
 def amplify(im):
     """Self-overlap."""
-    layer_1 = np.roll(a=im, axis=1, shift=75) / 3
-    layer_2 = np.roll(a=layer_1, axis=1, shift=75) / 5
-    im += layer_1
-    im += layer_2
-    im /= (1 + 1/3 + 1/15)
+    REPEATS = 0
+    shift = int(np.random.uniform(low=30, high=130))
+    sign = np.random.choice([-1, 1], 1)[0]
+    shift *= sign
+    print(shift)
+    delim, kt = 1, 3
+    layer_sh = np.roll(a=im, axis=1, shift=shift) / kt
+    im += layer_sh
+    delim += 1 / kt
+    kt /= 3
+
+    for _ in range(REPEATS):
+        layer_sh = np.roll(a=layer_sh, axis=1, shift=shift) / kt
+        im += layer_sh
+        delim += 1 / kt
+        kt /= 3
+
+    im /= delim
     # im[im > 1] = 1.0
     return im
 
@@ -140,7 +163,7 @@ def remove_whites(im):
 
 
 def rainbow_layer(im):
-    new_im = rb_shift(im, kt=88)
+    new_im = rgb_shift(im, kt=88)
     new_im = filters.gaussian(new_im, sigma=30, multichannel=True, mode='reflect', cval=0.6)
     img_hsv = color.rgb2hsv(new_im)
     img_hsv[..., 1] *= 3
