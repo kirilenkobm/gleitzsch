@@ -60,14 +60,22 @@ def rgb_shift(img, kt):
     return new_im
 
 
+def _bayer(im):
+    """Make monochrome pixels."""
+    h, w, d = im.shape
+    for i in range(h):
+        for j in range(w):
+            channels_to_rm = np.random.choice(range(3), size=2, replace=False)
+            im[i][j][channels_to_rm[0]] = 0.0
+            im[i][j][channels_to_rm[1]] = 0.0
+    return im
+
+
 def bayer(im):
     """Apply bayer filter to the image."""
     w, h, d = im.shape
     for i in range(0, w, 2):
         for j in range(0, h, 2):
-            # Looks like:
-            # G B
-            # R G
             im[i, j][0], im[i, j][2] = 0.0, 0.0
             im[i, j][1] /= 2.0
             try:
@@ -77,6 +85,17 @@ def bayer(im):
                 im[i + 1, j + 1][1] /= 2.0
             except IndexError:
                 pass  # we are out of the array
+    return im
+
+
+def amplify(im):
+    """Self-overlap."""
+    layer_1 = np.roll(a=im, axis=1, shift=75) / 3
+    layer_2 = np.roll(a=layer_1, axis=1, shift=75) / 5
+    im += layer_1
+    im += layer_2
+    im /= (1 + 1/3 + 1/15)
+    # im[im > 1] = 1.0
     return im
 
 
@@ -142,13 +161,14 @@ def make_rainbow(im):
     return new_arr
 
 
-def interlace(im):
+def interlace(im, zero_prob=0.9):
     """Add interlacing fields."""
     w, h, d = im.shape
     coeff, processed = 3, []
     shift_wide = 2
-    zero_prob = 0.9
-    half_prob = 0.05
+    # zero_prob = 0.9
+    # half_prob = 0.05
+    half_prob = (1 - zero_prob) / 2
     half_probs = [half_prob / shift_wide for _ in range(shift_wide)]
     shift_probs = half_probs + [zero_prob] + half_probs
     shif_pos = list(range(- shift_wide, shift_wide + 1))

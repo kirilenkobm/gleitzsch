@@ -12,7 +12,9 @@ from skimage import io
 from skimage import img_as_float
 from skimage import transform as tf
 from skimage import exposure
-from modules.filters import adjust_contrast, rgb_shift, bayer, interlace, add_vertical
+from skimage.draw import polygon
+from skimage import filters
+from modules.filters import adjust_contrast, rgb_shift, bayer, interlace, add_vertical, amplify
 from modules.bytes_glitch import glitch_bytes
 
 
@@ -61,6 +63,8 @@ def parse_args():
     app.add_argument("--gamma", "-g", type=float, default=None,
                      help="Gamma correction before mp3-ing. 0.5 as default.")
     app.add_argument("--bayer", action="store_true", dest="bayer", help="Apply Bayer filter.")
+    app.add_argument("--amplify", action="store_true", dest="amplify", help="Apply amplify filter.")
+    app.add_argument("--figures", action="store_true", dest="figures", help="Draw random shapes.")
     app.add_argument("--right_pecrentile", "-r", type=int, default=95,
                      help="Contrast stretching, right percentile, 90 as default. "
                           "Int in range [left percentile..100]")
@@ -150,6 +154,7 @@ def process_channel(channel, temp_dir, khz, bitrate):
     with open(mp3_decompressed, "rb") as f:
         mp3_bytes = f.read()
 
+    eprint("Compressed array of len {0}".format(len(bytes_str)))
     eprint("Decompressed array of len {0}".format(len(mp3_bytes)))
     proportion = len(mp3_bytes) // len(bytes_str)
     eprint("Proportion {0}".format(proportion))
@@ -165,6 +170,28 @@ def process_channel(channel, temp_dir, khz, bitrate):
     glitched[glitched < 0] = 0.0
     io.imsave("wat.jpg", glitched)
     return glitched
+
+
+def add_figs(im):
+    """Add random shapes."""
+    figs = np.zeros((im.shape[0], im.shape[1], 3))
+    wide = np.random.choice(range(10, 200), 1)[0]
+    poly = np.array((
+        (0, 0),
+        (0, wide),
+        (1000, wide),
+        (1000, 0),
+    ))
+    rr, cc = polygon(poly[:, 0], poly[:, 1], figs.shape)
+    figs[rr, cc, 0] = 0.7
+    figs[rr, cc, 1] = 0.1
+    figs[rr, cc, 2] = 0.2
+    # figs = interlace(figs, zero_prob=0.85)
+    figs = np.roll(figs, shift=np.random.choice(range(1000), 1)[0], axis=1)
+    figs = filters.gaussian(figs, sigma=5, multichannel=True, mode='reflect', cval=0.6)
+    im += figs
+    im[im > 1.0] = 1.0
+    return im
 
 
 def main():
@@ -199,6 +226,7 @@ def main():
     im = adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
     # correct shift
     im = np.roll(a=im, axis=1, shift=args.shift)
+    im = amplify(im) if args.amplify else im
     # save img
     io.imsave(fname=args.output, arr=im)
     # remove temp files
