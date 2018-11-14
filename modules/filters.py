@@ -7,6 +7,11 @@ from skimage import filters
 from skimage import color
 
 
+def parts(lst, n=25):
+    """Split an iterable into list of iterables of size n."""
+    return [lst[i:i + n] for i in iter(range(0, len(lst), n))]
+
+
 def adjust_contrast(im, l_p, r_p):
     """Contrast correction."""
     perc_left, perc_right = np.percentile(im, (l_p, r_p))
@@ -92,11 +97,40 @@ def bayer(im):
     """It is not a bayer filter anymore actually."""
     w, h, d = im.shape
     imlen = w * h * d
-    yes_not = np.random.choice([0, 1], imlen, p=[0.1, 0.9])
-    im_flat = np.reshape(im, imlen)
-    new_im_flat = [im_flat[i] if yes_not[i] == 1 else 0.0 for i in range(imlen)]
-    new_im = np.reshape(new_im_flat, (w, h, d))
+    pix_num = w * h
+    chan_numbers = np.random.choice([0, 1, 2], pix_num)
+    im_flat, new_im_flat = np.reshape(im, imlen), []
+    # new_im_flat = [im_flat[i] if yes_not[i] == 1 else 0.0 for i in range(imlen)]
+    for num, pixel in enumerate(parts(im_flat, n=3)):
+        color = [0.0, 0.0, 0.0]
+        chan_num = chan_numbers[num]
+        color[chan_num] = pixel[chan_num]
+        new_im_flat.extend(color)
+    print(len(new_im_flat))
+    new_im = np.reshape(np.array(new_im_flat), (w, h, d))
     return new_im
+
+
+def _bayer(im):
+    """It is not a bayer filter anymore actually."""
+    w, h, d = im.shape
+    imlen = w * h * d
+    # yes_not = np.random.choice([0, 1], imlen, p=[0.1, 0.9])
+    chan_numbers = np.random.choice([0, 1, 2], imlen)
+    im_flat, new_im_flat = np.reshape(im, imlen), []
+    # new_im_flat = [im_flat[i] if yes_not[i] == 1 else 0.0 for i in range(imlen)]
+    for i in range(imlen):
+        chan = chan_numbers[i]
+        if chan == 0:
+            color = [im_flat[0], 0, 0]
+        elif chan == 1:
+            color = [0, im_flat[1], 0]
+        else:
+            color = [0, 0, im_flat[2]]
+        new_im_flat.extend(color)
+    new_im = np.reshape(np.array(new_im_flat), (w, h, d))
+    return new_im
+
 
 def amplify(im):
     """Self-overlap."""

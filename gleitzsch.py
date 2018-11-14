@@ -14,9 +14,10 @@ from skimage import transform as tf
 from skimage import exposure
 from skimage.draw import polygon
 from skimage import filters
-from modules.filters import adjust_contrast, rgb_shift, bayer, interlace, add_vertical, amplify
+from modules.filters import adjust_contrast, rgb_shift, bayer, interlace, add_vertical, amplify, make_rainbow, glitter
 from modules.bytes_glitch import glitch_bytes
 from modules.generate_abs import make_abs
+from modules.blur_detection import detect_blur
 
 
 __author__ = "Bogdan Kirilenko, 2018"
@@ -76,7 +77,12 @@ def parse_args():
     app.add_argument("--interlacing", "-i", action="store_true", dest="interlacing", help="Interlacing")
     app.add_argument("--vertical", action="store_true", dest="vertical", help="Vertical lines.")
     app.add_argument("--kHz", type=float, default=16)
+    app.add_argument("--stripes", action="store_true", dest="stripes", help="stripes.")
     app.add_argument("--bitrate", default=16, type=int, help="Mp3 bitrate.")
+    app.add_argument("--rainbow", action="store_true", dest="rainbow", help="rainbow.")
+    app.add_argument("--magic", action="store_true", dest="magic", help="magic.")
+    app.add_argument("--glitter", action="store_true", dest="glitter", help="glitter.")
+
     args = app.parse_args()
     # create temp dir if not exists
     os.mkdir(args.temp_dir) if not os.path.isdir(args.temp_dir) else None
@@ -195,6 +201,22 @@ def add_figs(im):
     return im
 
 
+def add_magic(im):
+    """Add some magic."""
+    eprint("detecting blur...")
+    w, h, d = im.shape
+    blur_map_layer = np.reshape(detect_blur(im, kernel_size=10), (w, h, 1))
+    blur_map = np.concatenate((blur_map_layer, blur_map_layer, blur_map_layer), axis=2)
+    eprint("blur detected")
+    magic_layer = im
+    magic_layer = rgb_shift(magic_layer, kt=40)
+    magic_layer -= blur_map
+    magic_layer[magic_layer < 0] = 0.0
+    im += magic_layer
+    im[im > 1] = 1.0
+    return im
+
+
 def reconstruct(im, kHz):
     """Reconstruct shifted rows."""
     if kHz == 16.0:
@@ -222,6 +244,7 @@ def main():
     """Main func."""
     t0 = dt.now()
     args = parse_args()
+
     if args.bytes:  # apply glitch to bytes
         temp_bytes = os.path.join(args.temp_dir, "bytes_{0}.jpg".format(id_gen()))
         temp_files.append(temp_bytes)
@@ -233,8 +256,11 @@ def main():
     # read image, preprocess it
     im, shape = read_image(im_addr, args.size)  # read image
     gamma = args.gamma if args.gamma else auto_gamma(im)
-    im = (im + make_abs(im.shape, skip_half=0, x_shift=80, red=False))
+    im = (im + make_abs(im.shape, skip_half=0, x_shift=80, red=False)) if args.stripes else im
     im[im > 1.0] = 1.0
+    im = make_rainbow(im) if args.rainbow else im
+    im = glitter(im) if args.glitter else im
+    im = add_magic(im) if args.magic else im
     im = add_figs(im) if args.figures else im
     im = exposure.adjust_gamma(image=im, gain=gamma)
     im = im if not args.bayer else bayer(im)
