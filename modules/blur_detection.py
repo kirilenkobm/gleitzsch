@@ -25,7 +25,7 @@ def detect_blur(im, kernel_size=8):
     for i in range(w - kernel_size):
         for j in range(h - kernel_size):
             kernel = grey[i: i + kernel_size, j: j + kernel_size]
-            kernel_std = kernel.std() / 5
+            kernel_std = kernel.std() / 4
             blur_map[i: i + kernel_size, j: j + kernel_size] += kernel_std
     blur_map[blur_map > 1] = 1.0
     return blur_map

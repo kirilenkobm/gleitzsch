@@ -12,12 +12,11 @@ from skimage import io
 from skimage import img_as_float
 from skimage import transform as tf
 from skimage import exposure
-from skimage.draw import polygon
-from skimage import filters
-from modules.filters import adjust_contrast, rgb_shift, bayer, interlace, add_vertical, amplify, make_rainbow, glitter
+from modules import filters as fltrs
+from skimage import color
 from modules.bytes_glitch import glitch_bytes
 from modules.generate_abs import make_abs
-from modules.blur_detection import detect_blur
+from modules.make_text import make_text
 
 
 __author__ = "Bogdan Kirilenko, 2018"
@@ -62,26 +61,30 @@ def parse_args():
     app.add_argument("--temp_dir", type=str, default="temp", help="Directory to hold temp files.")
     app.add_argument("--blue_red_shift", "-b", type=int, default=0, help="use red/blue shift")
     app.add_argument("--shift", type=int, default=-200, help="Horizontal shift correction, pixels.")
-    app.add_argument("--gamma", "-g", type=float, default=None,
+    app.add_argument("--gamma", "--gm", type=float, default=None,
                      help="Gamma correction before mp3-ing. 0.5 as default.")
     app.add_argument("--bayer", action="store_true", dest="bayer", help="Apply Bayer filter.")
-    app.add_argument("--amplify", action="store_true", dest="amplify", help="Apply amplify filter.")
-    app.add_argument("--figures", action="store_true", dest="figures", help="Draw random shapes.")
-    app.add_argument("--right_pecrentile", "-r", type=int, default=95,
+    app.add_argument("--amplify", "-a", action="store_true", dest="amplify", help="Apply amplify filter.")
+    app.add_argument("--figures", "-f", action="store_true", dest="figures", help="Draw random shapes.")
+    app.add_argument("--right_pecrentile", "--rp", type=int, default=95,
                      help="Contrast stretching, right percentile, 90 as default. "
                           "Int in range [left percentile..100]")
-    app.add_argument("--left_pecrentile", "-l", type=int, default=10,
+    app.add_argument("--left_pecrentile", "--lp", type=int, default=10,
                      help="Contrast stretching, left percentile, 2 as default. "
                           "Int in range [0..right_percentile]")
+    app.add_argument("--text", default=None, help="add some text")
     app.add_argument("--bytes", action="store_true", dest="bytes", help="Glitch at the image bytes level.")
     app.add_argument("--interlacing", "-i", action="store_true", dest="interlacing", help="Interlacing")
     app.add_argument("--vertical", action="store_true", dest="vertical", help="Vertical lines.")
-    app.add_argument("--kHz", type=float, default=16)
-    app.add_argument("--stripes", action="store_true", dest="stripes", help="stripes.")
+    app.add_argument("--kHz", type=float, default=16, help="Mp3 resampling. Recommended values are: "
+                     "15.98, 15.99, 16.0 (default), 16.01")
+    app.add_argument("--stripes", "-s", action="store_true", dest="stripes", help="stripes.")
     app.add_argument("--bitrate", default=16, type=int, help="Mp3 bitrate.")
-    app.add_argument("--rainbow", action="store_true", dest="rainbow", help="rainbow.")
-    app.add_argument("--magic", action="store_true", dest="magic", help="magic.")
-    app.add_argument("--glitter", action="store_true", dest="glitter", help="glitter.")
+    app.add_argument("--rainbow", "-r", action="store_true", dest="rainbow", help="Add rainbow.")
+    # app.add_argument("--magic", action="store_true", dest="magic", help="magic.")
+    app.add_argument("--glitter", "-g", action="store_true", dest="glitter", help="Add some glitter.")
+    app.add_argument("--v_streaks", "-v", action="store_true", dest="v_streaks", help="Add vertical streaks.")
+    app.add_argument("--hor_shifts", "--hs", action="store_true", dest="hor_shifts", help="Add horizontal.. hm....")
 
     args = app.parse_args()
     # create temp dir if not exists
@@ -92,6 +95,7 @@ def parse_args():
 
 def read_image(input, size):
     """Read image, return 3D array of a size requested."""
+    die("Error! File {0} doesn't exist!".format(input)) if not os.path.isfile(input) else None
     matrix = img_as_float(io.imread(input))
     if len(matrix.shape) == 3:
         pass  # it's a 3D array already
@@ -179,65 +183,16 @@ def process_channel(channel, temp_dir, khz, bitrate):
     return glitched
 
 
-def add_figs(im):
-    """Add random shapes."""
-    figs = np.zeros((im.shape[0], im.shape[1], 3))
-    wide = np.random.choice(range(10, 200), 1)[0]
-    poly = np.array((
-        (0, 0),
-        (0, wide),
-        (1000, wide),
-        (1000, 0),
-    ))
-    rr, cc = polygon(poly[:, 0], poly[:, 1], figs.shape)
-    figs[rr, cc, 0] = 0.7
-    figs[rr, cc, 1] = 0.1
-    figs[rr, cc, 2] = 0.2
-    # figs = interlace(figs, zero_prob=0.85)
-    figs = np.roll(figs, shift=np.random.choice(range(1000), 1)[0], axis=1)
-    figs = filters.gaussian(figs, sigma=5, multichannel=True, mode='reflect', cval=0.6)
-    im += figs
-    im[im > 1.0] = 1.0
+def more_saturation(im):
+    """Increase saturation."""
+    hsl_im = color.rgb2hsv(im)
+    # hsl_im[:, :, 0] /= 2
+    # hsl_im[:, :, 0] += 0.1
+    hsl_im[:, :, 1] *= 1.45
+    # hsl_im[:, :, 2] *= 1
+    hsl_im[hsl_im > 1] = 1.0
+    im = color.hsv2rgb(hsl_im)
     return im
-
-
-def add_magic(im):
-    """Add some magic."""
-    eprint("detecting blur...")
-    w, h, d = im.shape
-    blur_map_layer = np.reshape(detect_blur(im, kernel_size=10), (w, h, 1))
-    blur_map = np.concatenate((blur_map_layer, blur_map_layer, blur_map_layer), axis=2)
-    eprint("blur detected")
-    magic_layer = im
-    magic_layer = rgb_shift(magic_layer, kt=40)
-    magic_layer -= blur_map
-    magic_layer[magic_layer < 0] = 0.0
-    im += magic_layer
-    im[im > 1] = 1.0
-    return im
-
-
-def reconstruct(im, kHz):
-    """Reconstruct shifted rows."""
-    if kHz == 16.0:
-        return im
-    w, h, d = im.shape
-    processed = []
-    for num, i in enumerate(range(0, w, 1)):
-        row = im[i: i + 1, :, :]
-        if kHz == 16.01:
-            shift = int(num * 0.5)
-        elif kHz == 15.99:
-            shift = int(num * -0.5)
-        elif kHz == 15.98:
-            shift = int(num * -1)
-        else:
-            shift = 0
-        row = np.roll(a=row, axis=1, shift=shift)
-        processed.append(row)
-    merge = np.concatenate(processed, axis=0)
-    merge = tf.resize(merge, (w, h))
-    return merge
 
 
 def main():
@@ -258,15 +213,30 @@ def main():
     gamma = args.gamma if args.gamma else auto_gamma(im)
     im = (im + make_abs(im.shape, skip_half=0, x_shift=80, red=False)) if args.stripes else im
     im[im > 1.0] = 1.0
-    im = make_rainbow(im) if args.rainbow else im
-    im = glitter(im) if args.glitter else im
-    im = add_magic(im) if args.magic else im
-    im = add_figs(im) if args.figures else im
+    # im = more_saturation(im)
+    im = fltrs.horizonal_shifts(im) if args.hor_shifts else im
+    im = fltrs.vert_streaks(im) if args.v_streaks else im
+    im = fltrs.add_figs(im) if args.figures else im
+
+    if args.text:
+        text_layer = make_text(args.text)
+        text_h, text_w, _ = text_layer.shape
+        new_text_w = int(shape[1] / 1.5)
+        print(new_text_w)
+        w_kt = text_w / new_text_w
+        new_text_h = int(text_h / w_kt)
+        text_layer = tf.resize(text_layer, (new_text_h, new_text_w))
+        text_x = random.choice(range(new_text_h, shape[0] - new_text_h * 2))
+        text_y = random.choice(range(20, shape[1] - (new_text_w + 50)))
+        im[text_x: text_x + new_text_h, text_y: text_y + new_text_w, :] = text_layer
+
+    im = fltrs.make_rainbow(im) if args.rainbow else im
+    im = fltrs.glitter(im) if args.glitter else im
     im = exposure.adjust_gamma(image=im, gain=gamma)
-    im = im if not args.bayer else bayer(im)
-    im = amplify(im) if args.amplify else im
-    im = im if not args.interlacing else interlace(im)
-    im = rgb_shift(im, args.blue_red_shift) if args.blue_red_shift > 0 else im
+    im = fltrs.bayer(im) if args.bayer else im
+    im = fltrs.amplify(im) if args.amplify else im
+    im = fltrs.interlace(im) if args.interlacing else im
+    im = fltrs.rgb_shift(im, args.blue_red_shift) if args.blue_red_shift > 0 else im
     # split in channels and mp3 them separately | concat channels back
     # red, green, blue = im[:, :, 0], im[:, :, 1], im[:, :, 2]
     # mp3d_chan = [process_channel(channel, shape, args.temp_dir, args.kHz) for channel in [red, green, blue]]
@@ -274,13 +244,13 @@ def main():
     mp3d_im = process_channel(im, args.temp_dir, args.kHz, args.bitrate)
     # mp3d_im = mp3d_im if not args.interlacing else interlace(mp3d_im)
     # stretch vertical bands if requred
-    mp3d_im = add_vertical(mp3d_im) if args.vertical else mp3d_im
+    mp3d_im = fltrs.add_vertical(mp3d_im) if args.vertical else mp3d_im
     # mp3d_im = rgb_shift(mp3d_im, args.blue_red_shift) if args.blue_red_shift > 0 else mp3d_im
     # correct contrast + misc postprocess
-    im = adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
+    im = fltrs.adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
     # correct shift
     im = np.roll(a=im, axis=1, shift=args.shift)
-    im = reconstruct(im, args.kHz)
+    im = fltrs.reconstruct(im, args.kHz)
     # save img
     io.imsave(fname=args.output, arr=im)
     # remove temp files
