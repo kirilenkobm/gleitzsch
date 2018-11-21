@@ -17,6 +17,7 @@ from skimage import color
 from modules.bytes_glitch import glitch_bytes
 from modules.generate_abs import make_abs
 from modules.make_text import make_text
+from modules import blur_detection
 
 
 __author__ = "Bogdan Kirilenko, 2018"
@@ -213,10 +214,14 @@ def main():
     gamma = args.gamma if args.gamma else auto_gamma(im)
     im = (im + make_abs(im.shape, skip_half=0, x_shift=80, red=False)) if args.stripes else im
     im[im > 1.0] = 1.0
+    blurre = blur_detection.detect_blur(color.rgb2gray(im))
+    io.imsave("blur.jpg", blurre)
+    exit()
     # im = more_saturation(im)
     im = fltrs.horizonal_shifts(im) if args.hor_shifts else im
     im = fltrs.vert_streaks(im) if args.v_streaks else im
     im = fltrs.add_figs(im) if args.figures else im
+    im = fltrs.amplify(im) if args.amplify else im
 
     if args.text:
         text_layer = make_text(args.text)
@@ -234,7 +239,6 @@ def main():
     im = fltrs.glitter(im) if args.glitter else im
     im = exposure.adjust_gamma(image=im, gain=gamma)
     im = fltrs.bayer(im) if args.bayer else im
-    im = fltrs.amplify(im) if args.amplify else im
     im = fltrs.interlace(im) if args.interlacing else im
     im = fltrs.rgb_shift(im, args.blue_red_shift) if args.blue_red_shift > 0 else im
     # split in channels and mp3 them separately | concat channels back

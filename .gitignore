@@ -1,6 +1,7 @@
 .idea/*
 modules/__pycache__/*
 test/*
+build/*
 output/*
 __pycache__/*
 .DS_Store

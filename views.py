@@ -91,7 +91,6 @@ def upload_file():
                                     filename=filename))
     return render_template('start_page.html')
 
-
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
      return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
