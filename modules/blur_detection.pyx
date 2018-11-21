@@ -13,6 +13,7 @@ cdef extern from "math.h":
 
 
 @cython.boundscheck(False)
+@cython.wraparound(False)
 def cyOptStdDev(ndarray[np.float64_t, ndim=1] a not None):
     cdef Py_ssize_t i
     cdef Py_ssize_t n = a.shape[0]
@@ -30,12 +31,14 @@ def cyOptStdDev(ndarray[np.float64_t, ndim=1] a not None):
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
 def detect_blur(ndarray[DTYPE_t, ndim=2] im, int kernel_size=8):
     """For an image of size W * H return blur map."""
-    cdef int w = im.shape[0]  # grayscale image is the must!
-    cdef int h = im.shape[1]
+    cdef Py_ssize_t w = im.shape[0]  # grayscale image is the must!
+    cdef Py_ssize_t h = im.shape[1]
     # grey = color.rgb2gray(im)
     cdef ndarray[DTYPE_t, ndim=2] blur_map = np.zeros((w, h))
     # cdef ndarray[DTYPE_t, ndim=2] kernel = np.zeros((kernel_size, kernel_size))
-    cdef float kernel_std
+    cdef double kernel_std
+    cdef Py_ssize_t i
+    cdef Py_ssize_t j
 
     for i in range(0, w - kernel_size, 2):
         for j in range(0, h - kernel_size, 2):

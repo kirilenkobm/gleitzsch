@@ -214,10 +214,7 @@ def main():
     gamma = args.gamma if args.gamma else auto_gamma(im)
     im = (im + make_abs(im.shape, skip_half=0, x_shift=80, red=False)) if args.stripes else im
     im[im > 1.0] = 1.0
-    blurre = blur_detection.detect_blur(color.rgb2gray(im))
-    io.imsave("blur.jpg", blurre)
-    exit()
-    # im = more_saturation(im)
+    # blurre = blur_detection.detect_blur(color.rgb2gray(im))
     im = fltrs.horizonal_shifts(im) if args.hor_shifts else im
     im = fltrs.vert_streaks(im) if args.v_streaks else im
     im = fltrs.add_figs(im) if args.figures else im
