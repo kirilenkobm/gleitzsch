@@ -4,5 +4,5 @@ imageio
 flask
 werkzeug
 scipy
-PIL
+PILLOW
 # lame installation
