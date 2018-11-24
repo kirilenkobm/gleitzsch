@@ -386,3 +386,15 @@ def reconstruct(im, kHz):
     merge = np.concatenate(processed, axis=0)
     merge = tf.resize(merge, (w, h))
     return merge
+
+
+def increase_saturation(im):
+    """Increase saturation."""
+    hsl_im = color.rgb2hsv(im)
+    # hsl_im[:, :, 0] /= 2
+    # hsl_im[:, :, 0] += 0.1
+    hsl_im[:, :, 1] *= 1.45
+    # hsl_im[:, :, 2] *= 1
+    hsl_im[hsl_im > 1] = 1.0
+    im = color.hsv2rgb(hsl_im)
+    return im

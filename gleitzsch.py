@@ -14,10 +14,12 @@ from skimage import transform as tf
 from skimage import exposure
 from modules import filters as fltrs
 from skimage import color
+from skimage import util
 from modules.bytes_glitch import glitch_bytes
 from modules.generate_abs import make_abs
 from modules.make_text import make_text
-from modules import blur_detection
+# from modules import blur_detection
+# from modules import audio_compression
 
 
 __author__ = "Bogdan Kirilenko, 2018"
@@ -74,15 +76,17 @@ def parse_args():
                      help="Contrast stretching, left percentile, 2 as default. "
                           "Int in range [0..right_percentile]")
     app.add_argument("--text", default=None, help="add some text")
+    app.add_argument("--text_font", default="emboss", help="Text fond, emboss as default.")
     app.add_argument("--bytes", action="store_true", dest="bytes", help="Glitch at the image bytes level.")
     app.add_argument("--interlacing", "-i", action="store_true", dest="interlacing", help="Interlacing")
     app.add_argument("--vertical", action="store_true", dest="vertical", help="Vertical lines.")
     app.add_argument("--kHz", type=float, default=16, help="Mp3 resampling. Recommended values are: "
                      "15.98, 15.99, 16.0 (default), 16.01")
+    app.add_argument("--sound_quality", "-q", default=9, help="Sound quality, 0..9")
     app.add_argument("--stripes", "-s", action="store_true", dest="stripes", help="stripes.")
     app.add_argument("--bitrate", default=16, type=int, help="Mp3 bitrate.")
     app.add_argument("--rainbow", "-r", action="store_true", dest="rainbow", help="Add rainbow.")
-    # app.add_argument("--magic", action="store_true", dest="magic", help="magic.")
+    app.add_argument("--magic", action="store_true", dest="magic", help="magic.")
     app.add_argument("--glitter", "-g", action="store_true", dest="glitter", help="Add some glitter.")
     app.add_argument("--v_streaks", "-v", action="store_true", dest="v_streaks", help="Add vertical streaks.")
     app.add_argument("--hor_shifts", "--hs", action="store_true", dest="hor_shifts", help="Add horizontal.. hm....")
@@ -131,7 +135,7 @@ def der_prozess(cmd):
         die("Error! Command {0} failed.".format(cmd))
 
 
-def process_channel(channel, temp_dir, khz, bitrate):
+def process_channel(channel, temp_dir, khz, bitrate, sound_quality):
     """Do in one step."""
     w, h, d = channel.shape
     channel_flat = np.reshape(channel, newshape=(w * h * d))
@@ -150,8 +154,8 @@ def process_channel(channel, temp_dir, khz, bitrate):
 
     # define commands
     # bitrate 12 -- 32 is fine
-    mp3_compr = '{lame} -r --unsigned -s {0} -q 9 --resample 16 --bitwidth 8 -b {1} -m m {2} "{3}"'\
-        .format(khz, bitrate, raw_channel, mp3_compressed, lame=LAME_BINARY)
+    mp3_compr = '{lame} -r --unsigned -s {0} -q {1} --resample 16 --bitwidth 8 -b {2} -m m {3} "{4}"'\
+        .format(khz, sound_quality, bitrate, raw_channel, mp3_compressed, lame=LAME_BINARY)
     mp3_decompr = '{lame} --decode -x -t "{0}" {1}'.format(mp3_compressed, mp3_decompressed, lame=LAME_BINARY)
 
     # write initial file | raw image
@@ -180,20 +184,8 @@ def process_channel(channel, temp_dir, khz, bitrate):
     # just in case
     glitched[glitched > 1] = 1.0
     glitched[glitched < 0] = 0.0
-    io.imsave("wat.jpg", glitched)
+    # io.imsave("wat.jpg", glitched)
     return glitched
-
-
-def more_saturation(im):
-    """Increase saturation."""
-    hsl_im = color.rgb2hsv(im)
-    # hsl_im[:, :, 0] /= 2
-    # hsl_im[:, :, 0] += 0.1
-    hsl_im[:, :, 1] *= 1.45
-    # hsl_im[:, :, 2] *= 1
-    hsl_im[hsl_im > 1] = 1.0
-    im = color.hsv2rgb(hsl_im)
-    return im
 
 
 def main():
@@ -215,22 +207,38 @@ def main():
     im = (im + make_abs(im.shape, skip_half=0, x_shift=80, red=False)) if args.stripes else im
     im[im > 1.0] = 1.0
     # blurre = blur_detection.detect_blur(color.rgb2gray(im))
+    if args.magic:
+        blurre = blur_detection.detect_blur(color.rgb2gray(im))
+        blurre = np.reshape(blurre, newshape=(shape[0], shape[1], 1))
+        blurre = np.concatenate((blurre, blurre, blurre), axis=2)
+        im_shifted = np.roll(im, shift=10, axis=1)
+        im_shifted -= blurre
+        im_shifted[im_shifted < 0] = 0
+        mask = util.invert(blurre)
+        im -= blurre
+        im[im < 0] = 0
+        im += im_shifted
+        im[im > 1] = 1
+
     im = fltrs.horizonal_shifts(im) if args.hor_shifts else im
     im = fltrs.vert_streaks(im) if args.v_streaks else im
     im = fltrs.add_figs(im) if args.figures else im
     im = fltrs.amplify(im) if args.amplify else im
 
     if args.text:
-        text_layer = make_text(args.text)
-        text_h, text_w, _ = text_layer.shape
-        new_text_w = int(shape[1] / 1.5)
-        print(new_text_w)
-        w_kt = text_w / new_text_w
-        new_text_h = int(text_h / w_kt)
-        text_layer = tf.resize(text_layer, (new_text_h, new_text_w))
-        text_x = random.choice(range(new_text_h, shape[0] - new_text_h * 2))
-        text_y = random.choice(range(20, shape[1] - (new_text_w + 50)))
-        im[text_x: text_x + new_text_h, text_y: text_y + new_text_w, :] = text_layer
+        if len(args.text.replace(" ", "")) == 0:
+            eprint("Warning, empty sequence in text.")
+        else:
+            text_layer = make_text(args.text, args.text_font)
+            text_h, text_w, _ = text_layer.shape
+            new_text_w = int(shape[1] / 1.5)
+            print(new_text_w)
+            w_kt = text_w / new_text_w
+            new_text_h = int(text_h / w_kt)
+            text_layer = tf.resize(text_layer, (new_text_h, new_text_w))
+            text_x = random.choice(range(new_text_h, shape[0] - new_text_h * 2))
+            text_y = random.choice(range(20, shape[1] - (new_text_w + 50)))
+            im[text_x: text_x + new_text_h, text_y: text_y + new_text_w, :] = text_layer
 
     im = fltrs.make_rainbow(im) if args.rainbow else im
     im = fltrs.glitter(im) if args.glitter else im
@@ -242,7 +250,10 @@ def main():
     # red, green, blue = im[:, :, 0], im[:, :, 1], im[:, :, 2]
     # mp3d_chan = [process_channel(channel, shape, args.temp_dir, args.kHz) for channel in [red, green, blue]]
     # mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
-    mp3d_im = process_channel(im, args.temp_dir, args.kHz, args.bitrate)
+
+    # mp3d_im = audio_compression.compress_sound(im)
+    mp3d_im = process_channel(im, args.temp_dir, args.kHz, args.bitrate, args.sound_quality)
+
     # mp3d_im = mp3d_im if not args.interlacing else interlace(mp3d_im)
     # stretch vertical bands if requred
     mp3d_im = fltrs.add_vertical(mp3d_im) if args.vertical else mp3d_im

@@ -5,9 +5,12 @@ import os
 from collections import defaultdict
 from skimage import io
 from skimage import img_as_float
+from skimage import transform as tf
 import numpy as np
 STRING_LEN = 30
 MAX_LEN = 180
+LETTER_W = 35
+LETTER_H = 40
 
 
 def parts(lst, n=25):
@@ -15,18 +18,19 @@ def parts(lst, n=25):
     return [lst[i:i + n] for i in iter(range(0, len(lst), n))]
 
 
-def read_letters():
+def read_letters(font):
     """Create letter: object dictionary."""
     this_folder = os.path.dirname(__file__)
     letters_dir = os.path.join(this_folder, "letters")
-    letter_pics = os.listdir(letters_dir)
+    letter_pics = [c for c in os.listdir(letters_dir) if c.startswith(font)]
     letters_array = {}
     for letter_pic in letter_pics:
-        letter = letter_pic.split(".")[0]
+        letter = letter_pic.split("_")[1].split(".")[0]
         letter_file = os.path.join(letters_dir, letter_pic)
         letter_array = img_as_float(io.imread(letter_file))
+        letter_array = tf.resize(letter_array, (LETTER_H, LETTER_W))
         letters_array[letter] = letter_array
-    letters_array[" "] = np.zeros((40, 35, 3))
+    letters_array[" "] = np.zeros((LETTER_H, LETTER_W, 3))
     return letters_array
 
 
@@ -75,10 +79,10 @@ def split_lines(words):
     return lines
 
 
-def make_text(text):
+def make_text(text, font):
     """Make a picture with the text requested."""
     text = text.upper()
-    letters_dict = read_letters()
+    letters_dict = read_letters(font)
     letters_available = list(letters_dict.keys())
     text = filter_text(text, letters_available)
     if len(text) > MAX_LEN:
@@ -120,5 +124,5 @@ if __name__ == "__main__":
     else:
         sys.stderr.write("Usage: {} \"your text\"\n".format(sys.argv[0]))
         sys.exit(0)
-    text_pic = make_text(text)
+    text_pic = make_text(text, "BEBAS")
     io.imsave(outfile, text_pic)

@@ -3,4 +3,6 @@ scikit-image
 imageio
 flask
 werkzeug
+scipy
+PIL
 # lame installation

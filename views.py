@@ -2,6 +2,7 @@ import subprocess
 import os
 import sys
 import random
+import string
 from skimage import io
 from werkzeug.utils import secure_filename
 from flask import render_template
@@ -18,8 +19,13 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.secret_key = os.urandom(64)
 
 
+def id_gen(size=12, chars=string.ascii_uppercase + string.digits):
+    """Return random string for temp files."""
+    return "".join(random.choice(chars) for _ in range(size))
+
+
 def glitch_it(input_image, params):
-    temp_name = str(random.randint(1000000, 9999999)) + '.jpg'
+    temp_name = id_gen() + '.jpg'
     temp_path = os.path.join(TEMP, temp_name)
     glitch_cmd = "{0} gleitzsch.py {1} {2}".format(sys.executable, input_image, temp_path)
     # add params if required
@@ -90,6 +96,7 @@ def upload_file():
             return redirect(url_for('uploaded_file',
                                     filename=filename))
     return render_template('start_page.html')
+
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
