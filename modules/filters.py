@@ -7,7 +7,7 @@ from skimage import transform as tf
 from skimage import filters
 from skimage import color
 from skimage.draw import polygon
-from modules.blur_detection import detect_blur
+# from modules.blur_detection import detect_blur
 
 
 def eprint(line, end="\n"):
