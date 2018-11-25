@@ -28,11 +28,11 @@ def id_gen(size=12, chars=string.ascii_uppercase + string.digits):
 def glitch_it(input_image, out_file, params, checkbox):
     # temp_name = id_gen() + '.jpg'
     # temp_path = os.path.join(TEMP, temp_name)
-    print(input_image)
     glitch_cmd = "{0} gleitzsch.py {1} {2}".format("python3", input_image, out_file)
     # add params if required
     glitch_cmd = glitch_cmd + " -b {}".format(params["blue_red"]) if params["blue_red"] else glitch_cmd
     glitch_cmd = glitch_cmd + " --text \"{}\"".format(params["text"]) if params["text"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " --hue_shift {}".format(params["hue_shift"]) if params["hue_shift"] else glitch_cmd
 
     glitch_cmd = glitch_cmd + " --hor_shifts" if checkbox["hp"] else glitch_cmd
     glitch_cmd = glitch_cmd + " --v_streaks" if checkbox["smudges"] else glitch_cmd
@@ -70,10 +70,15 @@ def make_text_params(text_params):
     blue_red = None if len(text_params["blue_red_raw"]) == 0 or not text_params["blue_red_raw"].isdigit() \
         else (int(text_params["blue_red_raw"]) // 2) * 2
     blue_red = None if blue_red and blue_red < 0 else blue_red  # it happens
+    # hue shift
+    hue_shift = None if text_params["hue_shift"] == "0.0" or not is_float(text_params["hue_shift"])\
+        else float(text_params["hue_shift"])
+    print(hue_shift)
     # text option
     text = None if len(text_params["text"]) == 0 else str(text_params["text"])
     gleitzsch_params = {"blue_red": blue_red,
-                        "text": text}
+                        "text": text,
+                        "hue_shift": hue_shift}
     return gleitzsch_params
 
 
@@ -90,6 +95,7 @@ def upload_file():
             # also extract params from form
             text_params, checkboxes = dict(), dict()
             text_params["blue_red_raw"] = request.form["blue_red_shift"]
+            text_params["hue_shift"] = request.form["hue_shift"]
             text_params["text"] = request.form["text"]
 
             checkboxes["hp"] = True if request.form.getlist("hp") else False

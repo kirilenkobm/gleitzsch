@@ -1,3 +1,4 @@
+# lame installation
 numpy
 scikit-image
 imageio
@@ -6,4 +7,4 @@ uwsgi
 werkzeug
 scipy
 PILLOW
-# lame installation
+piexif

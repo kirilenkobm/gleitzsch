@@ -165,6 +165,18 @@ def glitter(im, alen=250):
     return im
 
 
+def color_shift(im, val):
+    """Change color throw HSV space."""
+    im_hsv = color.rgb2hsv(im)
+    hue = im_hsv[:, :, 0]
+    hue += val
+    hue[hue > 1] = hue[hue > 1] - 1
+    hue[hue < 0] = hue[hue < 0] + 1
+    im_hsv[:, :, 0] = hue
+    im_rgb = color.hsv2rgb(im_hsv)
+    return im_rgb
+
+
 def black(im, thr):
     """Return two-colored bw image."""
     # get pixel sum (one number) instead of pixel (3 nums)

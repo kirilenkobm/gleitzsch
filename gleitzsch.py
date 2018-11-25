@@ -30,6 +30,7 @@ if os.name == "nt":  # windows
     LAME_BINARY = r".\lame.exe"
 else:  # using linux/macos
     LAME_BINARY = "lame"
+MP3_ITER_LIMIT = 10
 
 
 def eprint(line, end="\n"):
@@ -63,7 +64,7 @@ def parse_args():
     app.add_argument("--size", type=int, default=1000, help="Long dimension, 800 as default.")
     app.add_argument("--temp_dir", type=str, default="temp", help="Directory to hold temp files.")
     app.add_argument("--blue_red_shift", "-b", type=int, default=0, help="use red/blue shift")
-    app.add_argument("--shift", type=int, default=-200, help="Horizontal shift correction, pixels.")
+    app.add_argument("--shift", type=int, default=-190, help="Horizontal shift correction, pixels.")
     app.add_argument("--gamma", "--gm", type=float, default=None,
                      help="Gamma correction before mp3-ing. 0.5 as default.")
     app.add_argument("--bayer", action="store_true", dest="bayer", help="Apply Bayer filter.")
@@ -75,6 +76,8 @@ def parse_args():
     app.add_argument("--left_pecrentile", "--lp", type=int, default=10,
                      help="Contrast stretching, left percentile, 2 as default. "
                           "Int in range [0..right_percentile]")
+    app.add_argument("--hue_shift", type=float, default=None, help="Change colors throw HSV space."
+                                                                   "Float value from -1 to 1.")
     app.add_argument("--text", default=None, help="add some text")
     app.add_argument("--text_font", default="emboss", help="Text fond, emboss as default.")
     app.add_argument("--bytes", action="store_true", dest="bytes", help="Glitch at the image bytes level.")
@@ -90,11 +93,12 @@ def parse_args():
     app.add_argument("--glitter", "-g", action="store_true", dest="glitter", help="Add some glitter.")
     app.add_argument("--v_streaks", "-v", action="store_true", dest="v_streaks", help="Add vertical streaks.")
     app.add_argument("--hor_shifts", "--hs", action="store_true", dest="hor_shifts", help="Add horizontal.. hm....")
+    app.add_argument("--add_iterations", "--ai", default=0, type=int, help="Additional de/en-code cycles.")
 
     args = app.parse_args()
     # create temp dir if not exists
     os.mkdir(args.temp_dir) if not os.path.isdir(args.temp_dir) else None
-    die("Error! --blue_red_shift must be an even number!") if args.blue_red_shift % 2 !=0 else None
+    die("Error! --blue_red_shift must be an even number!") if args.blue_red_shift % 2 != 0 else None
     return args
 
 
@@ -121,7 +125,7 @@ def read_image(input, size):
 def auto_gamma(im):
     """Return the most suitable gamma for this situation."""
     # TODO
-    print(np.median(im))
+    # print(np.median(im))
     return 0.4
 
 
@@ -212,6 +216,8 @@ def main():
     im = fltrs.vert_streaks(im) if args.v_streaks else im
     im = fltrs.add_figs(im) if args.figures else im
     im = fltrs.amplify(im) if args.amplify else im
+    im = util.random_noise(im, mode="speckle")
+    im = fltrs.color_shift(im, args.hue_shift) if args.hue_shift else im
 
     if args.text:
         if len(args.text.replace(" ", "")) == 0:
@@ -241,6 +247,10 @@ def main():
 
     # mp3d_im = audio_compression.compress_sound(im)
     mp3d_im = process_channel(im, args.temp_dir, args.kHz, args.bitrate, args.sound_quality)
+    extra_iters = MP3_ITER_LIMIT if args.add_iterations >= MP3_ITER_LIMIT else args.add_iterations
+    for i in range(extra_iters):  # repeatedly compress and decompress
+        mp3d_im = process_channel(mp3d_im, args.temp_dir, 16.0, args.bitrate, args.sound_quality)
+    args.shift = args.shift if extra_iters == 0 else args.shift * (1 + extra_iters)
 
     # mp3d_im = mp3d_im if not args.interlacing else interlace(mp3d_im)
     # stretch vertical bands if requred
