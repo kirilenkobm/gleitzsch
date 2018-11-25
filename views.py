@@ -16,6 +16,7 @@ UPLOAD_FOLDER = here + '/static'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'JPG', 'JPEG'}
 TEMP = "temp"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.secret_key = os.urandom(64)
 
 
@@ -24,10 +25,11 @@ def id_gen(size=12, chars=string.ascii_uppercase + string.digits):
     return "".join(random.choice(chars) for _ in range(size))
 
 
-def glitch_it(input_image, params, checkbox):
+def glitch_it(input_image, out_file, params, checkbox):
     # temp_name = id_gen() + '.jpg'
     # temp_path = os.path.join(TEMP, temp_name)
-    glitch_cmd = "{0} gleitzsch.py {1} {2}".format("python3", input_image, input_image)
+    print(input_image)
+    glitch_cmd = "{0} gleitzsch.py {1} {2}".format("python3", input_image, out_file)
     # add params if required
     glitch_cmd = glitch_cmd + " -b {}".format(params["blue_red"]) if params["blue_red"] else glitch_cmd
     glitch_cmd = glitch_cmd + " --text \"{}\"".format(params["text"]) if params["text"] else glitch_cmd
@@ -51,7 +53,7 @@ def glitch_it(input_image, params, checkbox):
 
 def allowed_file(filename):
     return '.' in filename and \
-           filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+        filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
 
 def is_float(num):
@@ -101,12 +103,15 @@ def upload_file():
             params = make_text_params(text_params)
             file.save(in_file)
             # glitch the image
-            glitch_it(in_file, params, checkboxes)
+            output_filename = "{}.jpg".format(id_gen(12))
+            out_file = os.path.join(app.config["UPLOAD_FOLDER"], output_filename)
+            glitch_it(in_file, out_file, params, checkboxes)
             # save in the same folder
             # io.imsave(in_file, glim)
+            os.remove(in_file)
 
             return redirect(url_for('uploaded_file',
-                                    filename=filename))
+                                    filename=output_filename))
     return render_template('start_page.html')
 
 
