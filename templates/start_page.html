@@ -5,12 +5,12 @@
     <title>Gleitzsch</title>
       <style>
    body {
-    background-image: url(https://pp.userapi.com/c841427/v841427758/3b605/c_tYr1vUZg4.jpg);
-    background-color: #c7b39b;
+    background-color: #010101;
    }
     input.t4 {
     background: -moz-linear-gradient(#f2f2f2, #777, #404040, #252525);
-    background: -webkit-gradient(linear, 0 0, 0  100%, from(#f2f2f2), to(#252525), color-stop(0.6, #777), color-stop(0.6,  #404040));
+    background: -webkit-gradient(linear, 0 0, 0  100%, from(#f2f2f2), to(#252525),
+    color-stop(0.6, #777), color-stop(0.6,  #404040));
     color: #fff;
     border: 2px solid  #666;
 
@@ -20,21 +20,40 @@
     </head>
 <body>
     <div class="container" align="center">
-                <h1><img src="/static/logo.png" alt="Logo" width="250" height="150" align="center"></h1>
+                <!--<h1><img src="/static/logo.png" alt="Logo" width="250" height="150" align="center"></h1>-->
+                <h1 style="font-size:60px;color:#bbbbbb" align="center">GLEITZSCH </h1>
                 <br />
                 <form action="" method=post enctype=multipart/form-data>
-                    <p>                        <br><br> Your file: <br>
+                    <p style="color:#bbbbbb;"><br><br> Input file: <br></p>
+
                         <input type=file name=file class="t4">
-                        <p>Options:</p>
-                        <p>blue_red_shift | even positive integer like 2,4,8 etc. <input type = "text" name = "blue_red_shift" /></p>
-                        <p>gamma | float number like 0.1,1.2 etc. <input type = "text" name = "gamma" /></p>
-                        <p>blacks enchancement | integer positive value >= 0, like 1,3,5 etc. <input type = "text" name = "blacks" /></p>
-                        <p>whites enchancemnt |  integer positive value <= 100, like 80,90,95 etc. <input type ="text" name = "whites" /></p>
+                        <p style="color:#bbbbbb;">Options:</p>
+                        <p style="color:#bbbbbb;">aberrations intensity | even positive integer like 2, 4, 8 etc:
+                            <input type = "text" name = "blue_red_shift" /></p>
+                        <p style="color:#bbbbbb;">gamma correction| float number like 0.1, 1.2 etc:
+                            <input type = "text" name = "gamma" /></p>
+                        <p style="color:#bbbbbb;">add an inscription:
+                            <input type = "text" name = "text" /></p>
+                        <p style="color:#bbbbbb;">mp3 bitrate | positive integer like 12, 14, 16 etc:
+                            <input type = "text" name = "bitrate" /></p>
+
+                        <p style="color:#bbbbbb;">horizontal displacements:
+                            <input type = "checkbox" name = "hp" value="hp"/></p>
+                        <p style="color:#bbbbbb;">vertical smudges:
+                            <input type = "checkbox" name = "smudges" value="smudges"/></p>
+                        <p style="color:#bbbbbb;">add a rainbow:
+                            <input type = "checkbox" name = "rainbow" value="rainbow"/></p>
+                        <p style="color:#bbbbbb;">add glitter:
+                            <input type = "checkbox" name = "glitter" value="glitter"/></p>
+                        <p style="color:#bbbbbb;">add interlacing:
+                            <input type = "checkbox" name = "interlacing" value="interlacing"/></p>
+                        <p style="color:#bbbbbb;">add a crimson line:
+                            <input type = "checkbox" name = "crimson" value="crimson"/></p>
+
                         <input type="submit" name="okbuttan" value="GLITCH_IT!" class="t4">
                 </form>
 
                 <br />
-
     </div>
 
 

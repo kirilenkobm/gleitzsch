@@ -24,21 +24,29 @@ def id_gen(size=12, chars=string.ascii_uppercase + string.digits):
     return "".join(random.choice(chars) for _ in range(size))
 
 
-def glitch_it(input_image, params):
+def glitch_it(input_image, params, checkbox):
     temp_name = id_gen() + '.jpg'
     temp_path = os.path.join(TEMP, temp_name)
     glitch_cmd = "{0} gleitzsch.py {1} {2}".format(sys.executable, input_image, temp_path)
     # add params if required
-    glitch_cmd = glitch_cmd + " -g {0}".format(params["gamma"]) if params["gamma"] else glitch_cmd
-    glitch_cmd = glitch_cmd + " -b {0}".format(params["blue_red"]) if params["blue_red"] else glitch_cmd
-    glitch_cmd = glitch_cmd + " -l {0}".format(params["blacks"]) if params["blacks"] else glitch_cmd
-    glitch_cmd = glitch_cmd + " -r {0}".format(params["whites"]) if params["whites"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " -g {}".format(params["gamma"]) if params["gamma"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " -b {}".format(params["blue_red"]) if params["blue_red"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " --text \"{}\"".format(params["text"]) if params["text"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " --bitrate {}".format(params["bitrate"]) if params["bitrate"] else glitch_cmd
+
+    glitch_cmd = glitch_cmd + " --hor_shifts" if checkbox["hp"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " --v_streaks" if checkbox["smudges"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " --rainbow" if checkbox["rainbow"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " --glitter" if checkbox["glitter"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " --interlacing" if checkbox["interlacing"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " --figures" if checkbox["crimson"] else glitch_cmd
 
     rc = subprocess.call(glitch_cmd, shell=True)
     print(glitch_cmd)
     if rc != 0:
         print('FATALITY')
     out = io.imread(temp_path)
+    os.remove(temp_path)
     return out
 
 
@@ -55,21 +63,25 @@ def is_float(num):
         return False
 
 
-def make_params(blue_red_raw, gamma_raw, blacks_raw, whites_raw):
+def make_text_params(text_params):
     """Return params dict for glitcher."""
     # read black_red
-    blue_red = None if len(blue_red_raw) == 0 or not blue_red_raw.isdigit() else (int(blue_red_raw) // 2) * 2
+    blue_red = None if len(text_params["blue_red_raw"]) == 0 or not text_params["blue_red_raw"].isdigit() \
+        else (int(text_params["blue_red_raw"]) // 2) * 2
     blue_red = None if blue_red and blue_red < 0 else blue_red  # it happens
     # read gamma
-    gamma = None if len(gamma_raw) == 0 or not is_float(gamma_raw) else float(gamma_raw)
+    gamma = None if len(text_params["gamma_raw"]) == 0 or not is_float(text_params["gamma_raw"])\
+        else float(text_params["gamma_raw"])
     gamma = None if gamma and gamma < 0 else gamma  # if any user will
-    # read blacks
-    blacks = None if len(blacks_raw) == 0 or not blacks_raw.isdigit() else int(blacks_raw)
-    blacks = None if blacks and blacks < 0 else blacks
-    # and whites
-    whites = None if len(whites_raw) == 0 or not whites_raw.isdigit() else int(whites_raw)
-    whites = None if whites and whites < 0 else whites
-    return {"blue_red": blue_red, "gamma": gamma, "blacks": blacks, "whites": whites}
+    # text option
+    text = None if len(text_params["text"]) == 0 else str(text_params["text"])
+    bitrate = None if len(text_params["bitrate"]) == 0 or not text_params["bitrate"].isdigit() \
+        else int(text_params["bitrate"])
+    gleitzsch_params = {"blue_red": blue_red,
+                        "gamma": gamma,
+                        "text": text,
+                        "bitrate": bitrate}
+    return gleitzsch_params
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -80,16 +92,26 @@ def upload_file():
         if file and allowed_file(file.filename):
             # get file and save it
             filename = secure_filename(file.filename)
-            in_file = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            in_file = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+
             # also extract params from form
-            blue_red_raw = request.form['blue_red_shift']
-            gamma_raw = request.form['gamma']
-            blacks_raw = request.form["blacks"]
-            whites_wites = request.form["whites"]
-            params = make_params(blue_red_raw, gamma_raw, blacks_raw, whites_wites)
+            text_params, checkboxes = dict(), dict()
+            text_params["blue_red_raw"] = request.form["blue_red_shift"]
+            text_params["gamma_raw"] = request.form["gamma"]
+            text_params["text"] = request.form["text"]
+            text_params["bitrate"] = request.form["bitrate"]
+
+            checkboxes["hp"] = True if request.form.getlist("hp") else False
+            checkboxes["smudges"] = True if request.form.getlist("smudges") else False
+            checkboxes["rainbow"] = True if request.form.getlist("rainbow") else False
+            checkboxes["glitter"] = True if request.form.getlist("glitter") else False
+            checkboxes["interlacing"] = True if request.form.getlist("interlacing") else False
+            checkboxes["crimson"] = True if request.form.getlist("crimson") else False
+
+            params = make_text_params(text_params)
             file.save(in_file)
             # glitch the image
-            glim = glitch_it(in_file, params)
+            glim = glitch_it(in_file, params, checkboxes)
             # save in the same folder
             io.imsave(in_file, glim)
 
@@ -100,4 +122,4 @@ def upload_file():
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
-     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
