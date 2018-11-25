@@ -2,6 +2,7 @@ numpy
 scikit-image
 imageio
 flask
+uwsgi
 werkzeug
 scipy
 PILLOW
