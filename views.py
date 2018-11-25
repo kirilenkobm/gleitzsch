@@ -27,11 +27,11 @@ def id_gen(size=12, chars=string.ascii_uppercase + string.digits):
 def glitch_it(input_image, params, checkbox):
     temp_name = id_gen() + '.jpg'
     temp_path = os.path.join(TEMP, temp_name)
-    glitch_cmd = "{0} gleitzsch.py {1} {2}".format(sys.executable, input_image, temp_path)
+    glitch_cmd = "{0} gleitzsch.py {1} {2}".format("python3", input_image, temp_path)
     # add params if required
     glitch_cmd = glitch_cmd + " -g {}".format(params["gamma"]) if params["gamma"] else glitch_cmd
     glitch_cmd = glitch_cmd + " -b {}".format(params["blue_red"]) if params["blue_red"] else glitch_cmd
-    glitch_cmd = glitch_cmd + " --gtxt \"{}\"".format(params["text"]) if params["text"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " --text \"{}\"".format(params["text"]) if params["text"] else glitch_cmd
     glitch_cmd = glitch_cmd + " --bitrate {}".format(params["bitrate"]) if params["bitrate"] else glitch_cmd
 
     glitch_cmd = glitch_cmd + " --hor_shifts" if checkbox["hp"] else glitch_cmd

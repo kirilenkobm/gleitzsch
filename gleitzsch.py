@@ -75,7 +75,7 @@ def parse_args():
     app.add_argument("--left_pecrentile", "--lp", type=int, default=10,
                      help="Contrast stretching, left percentile, 2 as default. "
                           "Int in range [0..right_percentile]")
-    app.add_argument("--text", "--gtxt", default=None, help="add some text")
+    app.add_argument("--text", default=None, help="add some text")
     app.add_argument("--text_font", default="emboss", help="Text fond, emboss as default.")
     app.add_argument("--bytes", action="store_true", dest="bytes", help="Glitch at the image bytes level.")
     app.add_argument("--interlacing", "-i", action="store_true", dest="interlacing", help="Interlacing")
