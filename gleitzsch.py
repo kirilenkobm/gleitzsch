@@ -60,7 +60,7 @@ def parse_args():
     app = argparse.ArgumentParser()
     app.add_argument("input", type=str, help="Input image.")
     app.add_argument("output", type=str, help="Output file.")
-    app.add_argument("--size", type=int, default=800, help="Long dimension, 800 as default.")
+    app.add_argument("--size", type=int, default=1000, help="Long dimension, 800 as default.")
     app.add_argument("--temp_dir", type=str, default="temp", help="Directory to hold temp files.")
     app.add_argument("--blue_red_shift", "-b", type=int, default=0, help="use red/blue shift")
     app.add_argument("--shift", type=int, default=-200, help="Horizontal shift correction, pixels.")
@@ -207,18 +207,6 @@ def main():
     im = (im + make_abs(im.shape, skip_half=0, x_shift=80, red=False)) if args.stripes else im
     im[im > 1.0] = 1.0
     # blurre = blur_detection.detect_blur(color.rgb2gray(im))
-    if args.magic:
-        blurre = blur_detection.detect_blur(color.rgb2gray(im))
-        blurre = np.reshape(blurre, newshape=(shape[0], shape[1], 1))
-        blurre = np.concatenate((blurre, blurre, blurre), axis=2)
-        im_shifted = np.roll(im, shift=10, axis=1)
-        im_shifted -= blurre
-        im_shifted[im_shifted < 0] = 0
-        mask = util.invert(blurre)
-        im -= blurre
-        im[im < 0] = 0
-        im += im_shifted
-        im[im > 1] = 1
 
     im = fltrs.horizonal_shifts(im) if args.hor_shifts else im
     im = fltrs.vert_streaks(im) if args.v_streaks else im

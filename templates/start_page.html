@@ -1,41 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
+
+
 <head>
     <meta charset="UTF-8">
     <title>Gleitzsch</title>
       <style>
-   body {
-    background-color: #010101;
-   }
-    input.t4 {
-    background: -moz-linear-gradient(#f2f2f2, #777, #404040, #252525);
-    background: -webkit-gradient(linear, 0 0, 0  100%, from(#f2f2f2), to(#252525),
-    color-stop(0.6, #777), color-stop(0.6,  #404040));
-    color: #fff;
-    border: 2px solid  #666;
-
-   }
-
+        body {background-color: #ffffff;}
+        input.t4 {
+        background: -webkit-gradient(linear, 0 0, 0  100%, from(#999999), to(#aaaaaa),
+        color-stop(0.6, #777), color-stop(0.6,  #aaaaaa));
+        color: #fff;
+        border: 1px solid  #555;
+       }
   </style>
-    </head>
+</head>
+
 <body>
     <div class="container" align="center">
-                <!--<h1><img src="/static/logo.png" alt="Logo" width="250" height="150" align="center"></h1>-->
-                <h1 style="font-size:60px;color:#bbbbbb" align="center">GLEITZSCH </h1>
-                <br />
+                <h1><img src="/static/logo.png" alt="Logo" width="500" height="106" align="center"></h1>
+                <!--<h1 style="font-size:60px;color:#bbbbbb" align="center">GLEITZSCH</h1>-->
                 <form action="" method=post enctype=multipart/form-data>
-                    <p style="color:#bbbbbb;"><br><br> Input file: <br></p>
+                    <p style="color:#bbbbbb;"><br> INPUT FILE: <br></p>
 
                         <input type=file name=file class="t4">
-                        <p style="color:#bbbbbb;">Options:</p>
-                        <p style="color:#bbbbbb;">aberrations intensity | even positive integer like 2, 4, 8 etc:
-                            <input type = "text" name = "blue_red_shift" /></p>
-                        <p style="color:#bbbbbb;">gamma correction| float number like 0.1, 1.2 etc:
-                            <input type = "text" name = "gamma" /></p>
+                        <p style="color:#bbbbbb;">OPTIONS:</p>
+
+                        <p style="color:#bbbbbb;">aberrations intensity:
+                            <input type="range" name="blue_red_shift" min="0" max="32" step="2" value="4"/></p>
+                            <!--<input type = "text" name = "blue_red_shift" /></p>-->
                         <p style="color:#bbbbbb;">add an inscription:
                             <input type = "text" name = "text" /></p>
-                        <p style="color:#bbbbbb;">mp3 bitrate | positive integer like 12, 14, 16 etc:
-                            <input type = "text" name = "bitrate" /></p>
 
                         <p style="color:#bbbbbb;">horizontal displacements:
                             <input type = "checkbox" name = "hp" value="hp"/></p>
@@ -49,13 +44,21 @@
                             <input type = "checkbox" name = "interlacing" value="interlacing"/></p>
                         <p style="color:#bbbbbb;">add a crimson line:
                             <input type = "checkbox" name = "crimson" value="crimson"/></p>
+                        <p style="color:#bbbbbb;">decrease bitrate:
+                            <input type = "checkbox" name = "bitrate" value="bitrate"/></p>
 
-                        <input type="submit" name="okbuttan" value="GLITCH_IT!" class="t4">
+                        <input type="submit" name="okbuttan" value="GLITCH IT!" class="t4">
                 </form>
 
                 <br />
     </div>
 
+<br/>
+<br/>
+<br/>
+<br/>
+
+<h6 style="font-size:12px;color:#bbbbbb" align="center">Bogdan Kirilenko, 2018<br>No rights reserved</h6>
 
 </body>
 </html>
