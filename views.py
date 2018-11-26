@@ -41,6 +41,7 @@ def glitch_it(input_image, out_file, params, checkbox):
     glitch_cmd = glitch_cmd + " --interlacing" if checkbox["interlacing"] else glitch_cmd
     glitch_cmd = glitch_cmd + " --figures" if checkbox["crimson"] else glitch_cmd
     glitch_cmd = glitch_cmd + " --bitrate 12" if checkbox["bitrate"] else glitch_cmd
+    glitch_cmd = glitch_cmd + " --amplify" if checkbox["amplification"] else glitch_cmd
 
     rc = subprocess.call(glitch_cmd, shell=True)
     print(glitch_cmd)
@@ -105,6 +106,7 @@ def upload_file():
             checkboxes["interlacing"] = True if request.form.getlist("interlacing") else False
             checkboxes["crimson"] = True if request.form.getlist("crimson") else False
             checkboxes["bitrate"] = True if request.form.getlist("bitrate") else False
+            checkboxes["amplification"] = True if request.form.getlist("amplification") else False
 
             params = make_text_params(text_params)
             file.save(in_file)

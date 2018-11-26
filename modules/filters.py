@@ -236,7 +236,7 @@ def interlace(im, zero_prob=0.9):
 
     for num, i in enumerate(range(0, w, coeff)):
         row = im[i: i + coeff + 1, :, :]
-        row = row / 1.05 if num % 2 == 0 else row
+        row = row / 1.35 if num % 2 == 0 else row
         shift_p = np.random.choice(shif_pos, 1, p=shift_probs)[0]
         shift += shift_p
         row = np.roll(a=row, axis=0, shift=shift)  # small part

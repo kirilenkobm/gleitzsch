@@ -225,8 +225,9 @@ def main():
         else:
             text_layer = make_text(args.text, args.text_font)
             text_h, text_w, _ = text_layer.shape
-            new_text_w = int(shape[1] / 1.5)
-            print(new_text_w)
+            max_text_w = int(shape[1] / 1.5)
+            new_text_w = len(args.text) * 55
+            new_text_w = max_text_w if new_text_w > max_text_w else new_text_w
             w_kt = text_w / new_text_w
             new_text_h = int(text_h / w_kt)
             text_layer = tf.resize(text_layer, (new_text_h, new_text_w))
