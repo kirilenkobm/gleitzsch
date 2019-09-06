@@ -11,6 +11,11 @@ Also it needs a proper readmme.
 
 ## Usage
 
+To run the program you need:
+
+- all dependencies listed in requirements.txt installed
+- lame installed
+
 Command-line interface:
 
 ```txt
@@ -77,7 +82,7 @@ optional arguments:
 To run web-server just call:
 
 ```shell
-./runserver.py 
+./runserver.py
 ```
 
 ## What is glitch
