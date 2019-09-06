@@ -129,7 +129,7 @@ def amplify(im):
     shift = int(np.random.uniform(low=30, high=130))
     sign = np.random.choice([-1, 1], 1)[0]
     shift *= sign
-    print(shift)
+    # print(shift)
     delim, kt = 1, 3
     layer_sh = np.roll(a=im, axis=1, shift=shift) / kt
     im += layer_sh
@@ -147,7 +147,7 @@ def amplify(im):
     return im
 
 
-def glitter(im, alen=250):
+def glitter(im, alen=300):
     """Make glitter."""
     dots = []
     w, h, d = im.shape

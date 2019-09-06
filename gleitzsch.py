@@ -18,6 +18,7 @@ from skimage import util
 from modules.bytes_glitch import glitch_bytes
 from modules.generate_abs import make_abs
 from modules.make_text import make_text
+from modules.sound_glitch import process_mp3
 # from modules import blur_detection
 # from modules import audio_compression
 
@@ -89,11 +90,14 @@ def parse_args():
     app.add_argument("--stripes", "-s", action="store_true", dest="stripes", help="stripes.")
     app.add_argument("--bitrate", default=16, type=int, help="Mp3 bitrate.")
     app.add_argument("--rainbow", "-r", action="store_true", dest="rainbow", help="Add rainbow.")
-    app.add_argument("--magic", action="store_true", dest="magic", help="magic.")
+    # app.add_argument("--magic", action="store_true", dest="magic", help="magic.")
+    app.add_argument("--glitch_sound", "--gs", action="store_true", dest="glitch_sound", help="Distort the sound.")
     app.add_argument("--glitter", "-g", action="store_true", dest="glitter", help="Add some glitter.")
     app.add_argument("--v_streaks", "-v", action="store_true", dest="v_streaks", help="Add vertical streaks.")
     app.add_argument("--hor_shifts", "--hs", action="store_true", dest="hor_shifts", help="Add horizontal.. hm....")
     app.add_argument("--add_iterations", "--ai", default=0, type=int, help="Additional de/en-code cycles.")
+    app.add_argument("--keep_temp", action="store_true", dest="keep_temp",
+                     help="Do not remove temp files.")
 
     args = app.parse_args()
     # create temp dir if not exists
@@ -139,9 +143,10 @@ def der_prozess(cmd):
         die("Error! Command {0} failed.".format(cmd))
 
 
-def process_channel(channel, temp_dir, khz, bitrate, sound_quality):
+def process_channel(channel, temp_dir, khz, bitrate, sound_quality, glitch_sound):
     """Do in one step."""
     w, h, d = channel.shape
+    print(w, h, d)
     channel_flat = np.reshape(channel, newshape=(w * h * d))
     int_form_nd = np.around(channel_flat * 255, decimals=0)
     int_form_nd[int_form_nd > 255] = 255
@@ -168,6 +173,7 @@ def process_channel(channel, temp_dir, khz, bitrate, sound_quality):
 
     # call lame
     der_prozess(mp3_compr)  # compress
+    # process_mp3(mp3_compressed, (w, h))
     der_prozess(mp3_decompr)  # decompress
 
     # read decompressed file | get raw sequence
@@ -247,10 +253,10 @@ def main():
     # mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
 
     # mp3d_im = audio_compression.compress_sound(im)
-    mp3d_im = process_channel(im, args.temp_dir, args.kHz, args.bitrate, args.sound_quality)
+    mp3d_im = process_channel(im, args.temp_dir, args.kHz, args.bitrate, args.sound_quality, args.glitch_sound)
     extra_iters = MP3_ITER_LIMIT if args.add_iterations >= MP3_ITER_LIMIT else args.add_iterations
     for i in range(extra_iters):  # repeatedly compress and decompress
-        mp3d_im = process_channel(mp3d_im, args.temp_dir, 16.0, args.bitrate, args.sound_quality)
+        mp3d_im = process_channel(mp3d_im, args.temp_dir, 16.0, args.bitrate, args.sound_quality, args.glitch_sound)
     args.shift = args.shift if extra_iters == 0 else args.shift * (1 + extra_iters)
 
     # mp3d_im = mp3d_im if not args.interlacing else interlace(mp3d_im)
@@ -266,7 +272,7 @@ def main():
     io.imsave(fname=args.output, arr=im)
     # remove temp files
     for tfile in temp_files:
-        os.remove(tfile) if os.path.isfile(tfile) else None
+        os.remove(tfile) if os.path.isfile(tfile) and not args.keep_temp else None
     eprint("Estimated time: {0}".format(dt.now() - t0))
     sys.exit(0)
 
