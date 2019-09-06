@@ -99,6 +99,9 @@ def parse_args():
     app.add_argument("--keep_temp", action="store_true", dest="keep_temp",
                      help="Do not remove temp files.")
 
+    if len(sys.argv) < 3:
+        app.print_help()
+        sys.exit(0)
     args = app.parse_args()
     # create temp dir if not exists
     os.mkdir(args.temp_dir) if not os.path.isdir(args.temp_dir) else None
