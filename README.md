@@ -11,6 +11,8 @@ Also it needs a proper readmme.
 
 ## Usage
 
+Command-line interface:
+
 ```txt
 usage: gleitzsch.py [-h] [--size SIZE] [--temp_dir TEMP_DIR]
                     [--blue_red_shift BLUE_RED_SHIFT] [--shift SHIFT]
@@ -70,6 +72,12 @@ optional arguments:
   --add_iterations ADD_ITERATIONS, --ai ADD_ITERATIONS
                         Additional de/en-code cycles.
   --keep_temp           Do not remove temp files.
+```
+
+To run web-server just call:
+
+```shell
+./runserver.py 
 ```
 
 ## What is glitch
