@@ -1,12 +1,12 @@
 # lame installation
 # ffprobe
-numpy==1.13.1
-scikit-image==0.13.0
-imageio==2.4.1
-flask==0.12.2
+numpy>=1.13.1
+scikit-image>=0.13.0
+imageio>=2.4.1
+flask>=1.0.0
 uwsgi
-werkzeug==0.12.2
-scipy==0.19.1
-PILLOW==4.1.1
+werkzeug>=0.15.3
+scipy>=0.19.1
+PILLOW>=4.1.1
 # piexif
 pydub
