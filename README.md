@@ -89,6 +89,12 @@ optional arguments:
 
 Then open <http://0.0.0.0:5000> in a browser.
 
+Then something like this should appear:
+
+![alt text](examples/webface.png "Web interface")
+
+Functionality of this version covers almost all options of the CLI.
+
 ## What is glitch
 
 ![alt text](examples/ex_1.jpg "Example 1")
