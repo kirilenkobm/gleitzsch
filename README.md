@@ -16,7 +16,9 @@ To run the program you need:
 - all dependencies listed in requirements.txt installed
 - lame installed
 
-Command-line interface:
+You can use it with both command line and web interfaces.
+
+### Command-line interface
 
 ```txt
 usage: gleitzsch.py [-h] [--size SIZE] [--temp_dir TEMP_DIR]
@@ -79,11 +81,13 @@ optional arguments:
   --keep_temp           Do not remove temp files.
 ```
 
-To run web-server just call:
+### Web interface
 
 ```shell
 ./runserver.py
 ```
+
+Then open <http://0.0.0.0:5000> in a browser.
 
 ## What is glitch
 

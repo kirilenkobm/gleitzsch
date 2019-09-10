@@ -28,7 +28,7 @@ __version__ = 2.0
 temp_files = []
 # where the lame binary actually is
 if os.name == "nt":  # windows
-    LAME_BINARY = r".\lame.exe"
+    LAME_BINARY = "lame.exe"
 else:  # using linux/macos
     LAME_BINARY = "lame"
 MP3_ITER_LIMIT = 10
@@ -258,7 +258,7 @@ def main():
     # mp3d_im = audio_compression.compress_sound(im)
     mp3d_im = process_channel(im, args.temp_dir, args.kHz, args.bitrate, args.sound_quality, args.glitch_sound)
     extra_iters = MP3_ITER_LIMIT if args.add_iterations >= MP3_ITER_LIMIT else args.add_iterations
-    for i in range(extra_iters):  # repeatedly compress and decompress
+    for _ in range(extra_iters):  # repeatedly compress and decompress
         mp3d_im = process_channel(mp3d_im, args.temp_dir, 16.0, args.bitrate, args.sound_quality, args.glitch_sound)
     args.shift = args.shift if extra_iters == 0 else args.shift * (1 + extra_iters)
 
