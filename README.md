@@ -13,7 +13,7 @@ To run the program you need:
 - all python libraries listed in requirements.txt installed
 - lame installed
 
-Lime can be obtained at: <http://lame.sourceforge.net/>.
+Lame can be obtained at: <http://lame.sourceforge.net/>.
 
 You can use it with both command line and web interfaces.
 
