@@ -2,12 +2,9 @@
 
 A tool to make glitch.
 
-## Overall info
-
-I have created this project about 2 years ago.
-It supposed to be a mp3-conversion based images glitcher with web-interface.
-Now the project actually needs to be rearranged, cleaned up and polished.
-Also it needs a proper readmme.
+According the Wikipedia the glitch art "is the practice of using digital or analog errors for aesthetic purposes by either corrupting digital data or physically manipulating electronic devices".
+This particular tool compresses an image as mp3 sound file and decompresses it back into a glitched image.
+During this process it also might apply a variety of different filters.
 
 ## Usage
 
@@ -15,6 +12,8 @@ To run the program you need:
 
 - all dependencies listed in requirements.txt installed
 - lame installed
+
+Lime can be obtained at: <http://lame.sourceforge.net/>.
 
 You can use it with both command line and web interfaces.
 
@@ -82,6 +81,8 @@ optional arguments:
 ```
 
 ### Web interface
+
+Just run:
 
 ```shell
 ./runserver.py
