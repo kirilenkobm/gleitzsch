@@ -19,8 +19,6 @@ from modules.bytes_glitch import glitch_bytes
 from modules.generate_abs import make_abs
 from modules.make_text import make_text
 from modules.sound_glitch import process_mp3
-# from modules import blur_detection
-# from modules import audio_compression
 
 
 __author__ = "Bogdan Kirilenko, 2018"
@@ -31,6 +29,7 @@ if os.name == "nt":  # windows
     LAME_BINARY = "lame.exe"
 else:  # using linux/macos
     LAME_BINARY = "lame"
+
 MP3_ITER_LIMIT = 10
 
 
@@ -131,8 +130,7 @@ def read_image(input, size):
 
 def auto_gamma(im):
     """Return the most suitable gamma for this situation."""
-    # TODO
-    # print(np.median(im))
+    # TODO: implement this
     return 0.4
 
 
@@ -166,9 +164,9 @@ def process_channel(channel, temp_dir, khz, bitrate, sound_quality, glitch_sound
 
     # define commands
     # bitrate 12 -- 32 is fine
-    mp3_compr = '{lame} -r --unsigned -s {0} -q {1} --resample 16 --bitwidth 8 -b {2} -m m {3} "{4}"'\
-        .format(khz, sound_quality, bitrate, raw_channel, mp3_compressed, lame=LAME_BINARY)
-    mp3_decompr = '{lame} --decode -x -t "{0}" {1}'.format(mp3_compressed, mp3_decompressed, lame=LAME_BINARY)
+    mp3_compr = f'{LAME_BINARY} -r --unsigned -s {khz} -q {sound_quality} --resample 16 ' \
+                f'--bitwidth 8 -b {bitrate} -m m {raw_channel} "{mp3_compressed}"'
+    mp3_decompr = f'{LAME_BINARY} --decode -x -t "{mp3_compressed}" {mp3_decompressed}'
 
     # write initial file | raw image
     with open(raw_channel, "wb") as f:
@@ -197,7 +195,6 @@ def process_channel(channel, temp_dir, khz, bitrate, sound_quality, glitch_sound
     # just in case
     glitched[glitched > 1] = 1.0
     glitched[glitched < 0] = 0.0
-    # io.imsave("wat.jpg", glitched)
     return glitched
 
 
@@ -219,8 +216,8 @@ def main():
     gamma = args.gamma if args.gamma else auto_gamma(im)
     im = (im + make_abs(im.shape, skip_half=0, x_shift=80, red=False)) if args.stripes else im
     im[im > 1.0] = 1.0
-    # blurre = blur_detection.detect_blur(color.rgb2gray(im))
 
+    # apply requested pre-process filters
     im = fltrs.horizonal_shifts(im) if args.hor_shifts else im
     im = fltrs.vert_streaks(im) if args.v_streaks else im
     im = fltrs.add_figs(im) if args.figures else im
@@ -244,28 +241,23 @@ def main():
             text_y = random.choice(range(20, shape[1] - (new_text_w + 50)))
             im[text_x: text_x + new_text_h, text_y: text_y + new_text_w, :] = text_layer
 
+    # other filters
     im = fltrs.make_rainbow(im) if args.rainbow else im
     im = fltrs.glitter(im) if args.glitter else im
     im = exposure.adjust_gamma(image=im, gain=gamma)
     im = fltrs.bayer(im) if args.bayer else im
     im = fltrs.interlace(im) if args.interlacing else im
     im = fltrs.rgb_shift(im, args.blue_red_shift) if args.blue_red_shift > 0 else im
-    # split in channels and mp3 them separately | concat channels back
-    # red, green, blue = im[:, :, 0], im[:, :, 1], im[:, :, 2]
-    # mp3d_chan = [process_channel(channel, shape, args.temp_dir, args.kHz) for channel in [red, green, blue]]
-    # mp3d_im = np.concatenate((mp3d_chan[0], mp3d_chan[1], mp3d_chan[2]), axis=2)
 
-    # mp3d_im = audio_compression.compress_sound(im)
+    # img -> mp3 -> img
     mp3d_im = process_channel(im, args.temp_dir, args.kHz, args.bitrate, args.sound_quality, args.glitch_sound)
     extra_iters = MP3_ITER_LIMIT if args.add_iterations >= MP3_ITER_LIMIT else args.add_iterations
-    for _ in range(extra_iters):  # repeatedly compress and decompress
+    for _ in range(extra_iters):  # repeatedly compress and decompress if requested
         mp3d_im = process_channel(mp3d_im, args.temp_dir, 16.0, args.bitrate, args.sound_quality, args.glitch_sound)
     args.shift = args.shift if extra_iters == 0 else args.shift * (1 + extra_iters)
 
-    # mp3d_im = mp3d_im if not args.interlacing else interlace(mp3d_im)
-    # stretch vertical bands if requred
+    # add vertical bands if requred
     mp3d_im = fltrs.add_vertical(mp3d_im) if args.vertical else mp3d_im
-    # mp3d_im = rgb_shift(mp3d_im, args.blue_red_shift) if args.blue_red_shift > 0 else mp3d_im
     # correct contrast + misc postprocess
     im = fltrs.adjust_contrast(mp3d_im, args.left_pecrentile, args.right_pecrentile)
     # correct shift

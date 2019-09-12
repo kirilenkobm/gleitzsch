@@ -67,11 +67,8 @@ def make_abs(shape, x_shift=0, y_shift=0, skip_half=0, red=False):
             r = [point[0] + SQ_X, point[0] + SQ_X, point[0] - SQ_X, point[0] - SQ_X]
             c = [point[1] + SQ_Y, point[1] - SQ_Y, point[1] - SQ_Y, point[1] + SQ_Y]
             rr, cc = draw.polygon(r, c, shape=canvas.shape)
-
             canvas[rr, cc] = color
-
     canvas = filters.gaussian(canvas, sigma=3)
-
     return canvas
 
 

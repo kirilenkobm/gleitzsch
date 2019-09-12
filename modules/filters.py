@@ -150,18 +150,16 @@ def amplify(im):
 def glitter(im, alen=300):
     """Make glitter."""
     dots = []
-    w, h, d = im.shape
-    for i in range(alen):
+    w, h, _ = im.shape
+    for _ in range(alen):
         dx = random.choice(range(w))
         dy = random.choice(range(h))
         dots.append((dx, dy))
-
     for dot in dots:
         try:
             im[dot[0] - 1: dot[0], dot[1] - 3: dot[1] + 3, :] = 1
         except IndexError:
             pass
-
     return im
 
 
@@ -226,8 +224,7 @@ def interlace(im, zero_prob=0.9):
     w, h, d = im.shape
     coeff, processed = 3, []
     shift_wide = 2
-    # zero_prob = 0.9
-    # half_prob = 0.05
+
     half_prob = (1 - zero_prob) / 2
     half_probs = [half_prob / shift_wide for _ in range(shift_wide)]
     shift_probs = half_probs + [zero_prob] + half_probs
@@ -241,7 +238,6 @@ def interlace(im, zero_prob=0.9):
         shift += shift_p
         row = np.roll(a=row, axis=0, shift=shift)  # small part
         row = np.roll(a=row, axis=1, shift=shift)  # long size
-        # row = np.roll(a=row, axis=2, shift=shift_p)  # color
         processed.append(row)
 
     merge = np.concatenate(processed, axis=0)
@@ -253,7 +249,6 @@ def add_vertical(image):
     """Hard to say."""
     first_row = np.reshape(image[0, :, :], newshape=(1, image.shape[1], image.shape[2]))
     stretch = np.repeat(first_row, image.shape[0], axis=0)
-    # stretch[stretch > 0.95] = 0
     add = image + stretch / 10
     add[add > 1] = 1.0
     return add
@@ -276,8 +271,6 @@ def vert_streaks(im):
         shifts_raw = sorted([i if i > 0 else -i for i in map(int, np.random.normal(5, 10, piece_w))])
         shifts_add = np.random.choice(range(-5, 2), piece_w)
         shifts_mod = [shifts_raw[i] + shifts_add[i] for i in range(piece_w)]
-        # shift_probs = [i / sum(range(22)) for i in range(22)]
-        # shifts_raw = sorted(np.random.choice(range(22), piece_w, p=shift_probs))
         shifts_left = [shifts_mod[i] for i in range(0, piece_w, 2)]
         shifts_right = sorted([shifts_mod[i] for i in range(1, piece_w, 2)], reverse=True)
         shifts = shifts_left + shifts_right
@@ -369,7 +362,6 @@ def add_figs(im):
     figs[rr, cc, 0] = 0.7
     figs[rr, cc, 1] = 0.1
     figs[rr, cc, 2] = 0.2
-    # figs = interlace(figs, zero_prob=0.85)
     figs = np.roll(figs, shift=np.random.choice(range(1000), 1)[0], axis=1)
     figs = filters.gaussian(figs, sigma=5, multichannel=True, mode='reflect', cval=0.6)
     im += figs
@@ -403,10 +395,7 @@ def reconstruct(im, kHz):
 def increase_saturation(im):
     """Increase saturation."""
     hsl_im = color.rgb2hsv(im)
-    # hsl_im[:, :, 0] /= 2
-    # hsl_im[:, :, 0] += 0.1
     hsl_im[:, :, 1] *= 1.45
-    # hsl_im[:, :, 2] *= 1
     hsl_im[hsl_im > 1] = 1.0
     im = color.hsv2rgb(hsl_im)
     return im

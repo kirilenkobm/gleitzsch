@@ -1,9 +1,11 @@
 .idea/*
 .DS_Store/
 .DS_Store
+
 modules/__pycache__/*
+__pycache__/*
+
+static/*.jpg
 test/*
 build/*
 output/*
-__pycache__/*
-static/*.jpg
