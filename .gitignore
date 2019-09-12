@@ -9,3 +9,7 @@ static/*.jpg
 test/*
 build/*
 output/*
+
+input/
+output/
+trash/

@@ -97,6 +97,8 @@ Functionality of this version covers almost all options of the CLI.
 
 ## What is glitch
 
+![alt text](examples/ex_4.jpg "Example 4")
+
 ![alt text](examples/ex_1.jpg "Example 1")
 
 ![alt text](examples/ex_2.jpg "Example 2")
