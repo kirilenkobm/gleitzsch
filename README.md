@@ -1,6 +1,6 @@
 # Gleitzsch
 
-A tool to make glitch.
+A tool to generate glitch art.
 
 According the Wikipedia the glitch art "is the practice of using digital or analog errors for aesthetic purposes by either corrupting digital data or physically manipulating electronic devices".
 This particular tool compresses an image as mp3 sound file and decompresses it back into a glitched image.
@@ -10,7 +10,7 @@ During this process it also might apply a variety of different filters.
 
 To run the program you need:
 
-- all dependencies listed in requirements.txt installed
+- all python libraries listed in requirements.txt installed
 - lame installed
 
 Lime can be obtained at: <http://lame.sourceforge.net/>.
