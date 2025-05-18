@@ -12,25 +12,22 @@ class FrameProcessor {
     private let graph = ProcessingGraph()
 
     init() {
-        // Add image domain filters
-        graph.addFilter(GammaFilter())
-        // graph.addFilter(ChromaticAberration())
-
-        // Add 2D FFT/iFFT passthrough
-        graph.addFilter(ColorFFTFilter()) // заменили FFTFilter
+        graph.addFilter(GammaFilter(gamma: 4.0))
+        graph.addFilter(ChromaticAberrationFilter(intensity: 1.5))
+        graph.addFilter(FFTFilter())
     }
 
     func process(_ image: CGImage) -> CGImage {
-        // Step 1: ресайз до квадрата 512×512
         let targetSize = CGSize(width: 512, height: 512)
         let resized = image.resized(to: targetSize) ?? image
 
-        // Step 2: прогоняем через фильтры
-        let processed = graph.process(resized)
+        var (r, g, b) = resized.toRGBFloatChannels()
+        let width = Int(targetSize.width)
+        let height = Int(targetSize.height)
 
-        // Step 3: ресайз обратно к оригиналу
-        let restored = processed.resized(to: CGSize(width: image.width, height: image.height)) ?? processed
+        graph.process(r: &r, g: &g, b: &b, width: width, height: height)
 
-        return restored
+        let processed = CGImage.fromRGBFloatChannels(r: r, g: g, b: b, width: width, height: height)
+        return processed?.resized(to: CGSize(width: image.width, height: image.height)) ?? image
     }
 }

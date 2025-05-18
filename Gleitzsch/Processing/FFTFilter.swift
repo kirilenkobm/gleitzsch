@@ -7,51 +7,41 @@
 import Accelerate
 import CoreImage
 
-class ColorFFTFilter: ImageFilter {
+class FFTFilter: FloatRGBFilter {
     private var scratch: ColorFFTScratch?
     private var setup: FFTSetup?
     let filter = KillLowFrequencies()
 
-    func apply(to image: CGImage) -> CGImage {
-        let width = image.width
-        let height = image.height
-
+    func apply(r: inout [Float], g: inout [Float], b: inout [Float], width: Int, height: Int) {
         if scratch == nil || scratch?.width != width || scratch?.height != height {
             scratch = ColorFFTScratch(width: width, height: height)
         }
 
-        guard let scratch = scratch else { return image }
-
-        let (r, g, b) = image.toRGBFloatChannels()
-        guard r.count == width * height else { return image }
+        guard let scratch = scratch else { return }
 
         let log2n = scratch.log2n
         if setup == nil {
             setup = vDSP_create_fftsetup(log2n, FFTRadix(kFFTRadix2))
         }
-        guard let setup = setup else { return image }
+        guard let setup = setup else { return }
 
-        let count = width
-        let normFactor = Float(count)
+        let normFactor = Float(height)
 
-        // Обрабатываем каждый канал
-        for (channel, data) in [(scratch.rBuffer, r), (scratch.gBuffer, g), (scratch.bBuffer, b)] {
-            // Транспонируем входной массив: width×height → height×width
+        for (input, channel) in [(r, scratch.rBuffer), (g, scratch.gBuffer), (b, scratch.bBuffer)] {
+            // транспонируем: width×height → height×width
             var transposed = [Float](repeating: 0, count: width * height)
-            vDSP_mtrans(data, 1, &transposed, 1, vDSP_Length(height), vDSP_Length(width))
+            vDSP_mtrans(input, 1, &transposed, 1, vDSP_Length(height), vDSP_Length(width))
 
             var output = [Float](repeating: 0, count: width * height)
 
             for row in 0..<width {
                 let rowStart = row * height
 
-                // временные буферы
                 var tempReal = [Float](repeating: 0, count: height)
                 var tempImag = [Float](repeating: 0, count: height)
 
                 for i in 0..<height {
                     tempReal[i] = transposed[rowStart + i]
-                    tempImag[i] = 0
                 }
 
                 tempReal.withUnsafeMutableBufferPointer { real in
@@ -71,21 +61,13 @@ class ColorFFTFilter: ImageFilter {
                 }
             }
 
-            // Обратно транспонируем output: height×width → width×height
+            // обратно: height×width → width×height
             vDSP_mtrans(output, 1, &channel.real, 1, vDSP_Length(width), vDSP_Length(height))
         }
 
-        let rOut = scratch.rBuffer.real.normalizeToZeroOne()
-        let gOut = scratch.gBuffer.real.normalizeToZeroOne()
-        let bOut = scratch.bBuffer.real.normalizeToZeroOne()
-
-        return CGImage.fromRGBFloatChannels(
-            r: rOut,
-            g: gOut,
-            b: bOut,
-            width: width,
-            height: height
-        ) ?? image
+        r = scratch.rBuffer.real.normalizeToZeroOne()
+        g = scratch.gBuffer.real.normalizeToZeroOne()
+        b = scratch.bBuffer.real.normalizeToZeroOne()
     }
 
     deinit {

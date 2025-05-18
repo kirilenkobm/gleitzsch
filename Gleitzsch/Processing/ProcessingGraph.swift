@@ -8,15 +8,15 @@ import Foundation
 import CoreImage
 
 class ProcessingGraph {
-    private var filters: [ImageFilter] = []
+    private var filters: [FloatRGBFilter] = []
 
-    func addFilter(_ filter: ImageFilter) {
+    func addFilter(_ filter: FloatRGBFilter) {
         filters.append(filter)
     }
 
-    func process(_ image: CGImage) -> CGImage {
-        filters.reduce(image) { result, filter in
-            filter.apply(to: result)
+    func process(r: inout [Float], g: inout [Float], b: inout [Float], width: Int, height: Int) {
+        for filter in filters {
+            filter.apply(r: &r, g: &g, b: &b, width: width, height: height)
         }
     }
 }
