@@ -1,53 +1,85 @@
 # Gleitzsch
 
-**Gleitzsch** is a glitch-art camera app for iOS. It captures live video, processes frames in real time, and applies visual effects like FFT-based distortions (to be added). The architecture is modular, extensible, and optimized for real-time performance.
+**Gleitzsch** is an iOS app for real-time glitch-art camera effects. It captures frames from the camera, optionally processes them (e.g. FFT-based distortions), and renders the result to the screen. Architecture is modular and ready for extension (e.g. video, filters, settings).
+
+This README.md is written primarily for LLMs :).
 
 ---
 
 ## 🔧 Architecture Overview
 
-The app is split into clear layers:
+The project follows a streaming pipeline:
 
-Camera → Resize/Orientation → Processing → Display → Capture
+CameraManager
+↓
+CIImage (oriented) → CGImage
+↓
+FrameProcessor (filters: gamma → chromaticAberration → FFT → glitch → iFFT)
+↓
+FramePipeline (binds processing to UI)
+↓
+CameraViewModel (exposes @Published frame)
+↓
+SwiftUI ContentView (renders preview)
 
-Each step is separated for maintainability and testability.
-
-### 🧩 Components
-
-| Layer             | Class               | Responsibility |
-|------------------|---------------------|----------------|
-| Capture          | `CameraManager`     | Captures frames via `AVCaptureVideoDataOutput` and orients them correctly |
-| Processing       | `FrameProcessor`    | Applies visual effects (FFT glitch etc.) — currently a passthrough |
-| Pipeline         | `FramePipeline`     | Connects capture and processing layers, handles data flow |
-| View Model       | `CameraViewModel`   | Binds processed frames to the UI and manages state |
-| UI               | `ContentView`       | SwiftUI layout showing the live preview and capture controls |
-
----
-
-## ⚙️ How it works
-
-- The app uses `AVCaptureSession` to get live camera frames.
-- Each frame is converted to `CGImage`, corrected for orientation, and passed through the pipeline.
-- Future versions will apply FFT-based glitching and color channel effects.
-- The UI uses SwiftUI and automatically adapts to device orientation.
+All processing is done off-main-thread. UI only observes and renders the latest frame.
 
 ---
 
-## 🚀 Planned features
+## 🧩 Core Components
 
-- Real-time glitch effects (FFT, chromatic aberration, gamma distortion)
-- Adjustable effect intensity
-- Snapshots with visual effects applied
-- Optional video recording
+| File / Class            | Location                  | Purpose |
+|-------------------------|---------------------------|---------|
+| `CameraManager.swift`   | `Camera/`                 | Captures camera frames, converts to `CGImage`, orients image (`.right`) |
+| `FrameProcessor.swift`  | `Processing/`             | Processes `CGImage` (currently passthrough, future: glitch filters) |
+| `FramePipeline.swift`   | `Pipeline/`               | Connects `CameraManager` to `FrameProcessor`, publishes processed frames |
+| `CameraViewModel.swift` | `ViewModels/`             | Observes `FramePipeline`, exposes `@Published currentFrame` for UI |
+| `ContentView.swift`     | `Views/`                  | SwiftUI UI, displays image, capture button, reacts to device orientation |
+
+---
+
+## ⚙️ Frame Flow
+
+Each captured frame goes through:
+
+CIImage (oriented) → gamma correction
+→ chromatic aberration
+→ FFT
+→ glitch
+→ iFFT → CGImage
+
+(Current implementation is passthrough; filter logic is to be added in `FrameProcessor.swift`.)
+
+Frames are displayed using `.scaledToFill()` and `CGImage` is rotated using `.oriented(.right)` before conversion.
+
+
+## 🧪 Device Orientation
+
+- Frames are always captured in landscape.
+- The UI elements (e.g. buttons) are rotated using `UIDevice.orientationDidChangeNotification`.
+- Captured images are saved with correct `UIImageOrientation` (`.right`) for EXIF consistency.
 
 ---
 
 ## 📁 Project Structure
 
+```
 Gleitzsch/
-├── Camera/             // Frame capture logic
-├── Processing/         // Frame processing and filters
-├── Pipeline/           // Connects camera to processor
-├── ViewModels/         // Bindings and logic for the UI
+├── Camera/             // CameraManager and frame source
+├── Processing/         // FrameProcessor and future filters
+├── Pipeline/           // Data flow and coordination
+├── ViewModels/         // CameraViewModel — binds pipeline to UI
 ├── Views/              // SwiftUI interface
-├── Utils/              // Constants, extensions, etc.
+├── Utils/              // App-wide constants and helpers
+├── GleitzschApp.swift  // Entry point
+```
+
+## 🚧 Roadmap
+
+- [ ] Implement FFT-based glitch filter
+- [ ] Add intensity/config sliders
+- [ ] Save processed video
+- [ ] AppClip or LivePhoto support
+
+---
+
