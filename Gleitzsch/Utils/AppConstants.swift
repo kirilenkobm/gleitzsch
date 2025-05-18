@@ -7,5 +7,5 @@
 
 
 struct AppConstants {
-    static let bufferSize = 5
+    
 }
