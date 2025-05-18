@@ -5,6 +5,13 @@ using namespace metal;
 #define N 512
 inline uint bitReverse9(uint x) { return reverse_bits(x) >> 23; } // 32-9 = 23
 
+inline uint hash_u32(uint x)                // very cheap LCG hash
+{
+    x ^= x >> 16;  x *= 0x7feb352d;
+    x ^= x >> 15;  x *= 0x846ca68b;
+    x ^= x >> 16;  return x;
+}
+
 /* ---------- FFT ---------- */
 kernel void fft1D_512(device float *realOut [[buffer(0)]],
                       device float *imagOut [[buffer(1)]],
@@ -126,22 +133,62 @@ kernel void killBands_1D_512(device float *real   [[buffer(0)]],
     }
 }
 
-
-kernel void transpose512(device float *src [[buffer(0)]],
-                         device float *dst [[buffer(1)]],
-                         uint2  tid [[thread_position_in_threadgroup]],
-                         uint2  gid [[threadgroup_position_in_grid]])
+kernel void alt_killBands_1D_512(device   float *real  [[buffer(0)]],
+                                 device   float *imag  [[buffer(1)]],
+                                 constant uint  &cutLo [[buffer(2)]],
+                                 constant uint  &cutHi [[buffer(3)]],
+                                 constant uint  &seed  [[buffer(4)]],   // frameSeed
+                                 constant float &intensity [[buffer(5)]], // 0 … 1
+                                 uint gid [[thread_position_in_grid]])
 {
-    // работаем плиткой 16×16 (ровно 512/32 = 16 групп)
+    uint  freq = gid % N;                       // 0 … 511
+    if (freq == 0) return;                      // keep DC
+
+    /* attenuation 0–1 (scaled by intensity) */
+    float att = mix(1.0f,
+                    0.0f,
+                    smoothstep(float(cutLo), float(N - cutHi), float(freq)));
+    att = mix(1.0f, att, intensity);           // intensity = 0 → no att
+
+    /* random phase (scaled by intensity) */
+    float phi = 6.2831853f *
+                fract(float(hash_u32(freq + seed)) * 2.3283064e-10f) *
+                intensity;                     // intensity = 0 → no shift
+
+    float re = real[gid] * att;
+    float im = imag[gid] * att;
+
+    real[gid] =  re * cos(phi) - im * sin(phi);
+    imag[gid] =  re * sin(phi) + im * cos(phi);
+}
+
+kernel void transpose512(device   float *src   [[buffer(0)]],
+                         device   float *dst   [[buffer(1)]],
+                         constant uint  &seed  [[buffer(2)]],
+                         constant float &intensity [[buffer(3)]], // 0-1
+                         uint2 tid [[thread_position_in_threadgroup]],
+                         uint2 gid [[threadgroup_position_in_grid]])
+{
     constexpr uint TILE = 16;
-    threadgroup float tile[TILE][TILE+1];       // +1 чтобы избежать bank conflict
+    threadgroup float tile[TILE][TILE+1];
 
-    uint gx = gid.x * TILE + tid.x;             // глобальные координаты
+    /* load */
+    uint gx = gid.x * TILE + tid.x;
     uint gy = gid.y * TILE + tid.y;
-
-    tile[tid.y][tid.x] = src[gy * 512 + gx];    // читаем
+    tile[tid.y][tid.x] = src[gy * 512 + gx];
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    gx = gid.y * TILE + tid.x;                  // меняем местами
+
+    /* transpose coords */
+    gx = gid.y * TILE + tid.x;
     gy = gid.x * TILE + tid.y;
-    dst[gy * 512 + gx] = tile[tid.x][tid.y];    // пишем
+
+    /* VHS tweaks — scaled by intensity */
+    float scanMul = 1.0f - (0.08f * intensity) * float(gy & 1);
+    int   rawJit  = int(hash_u32(gy + seed) & 7) - 3;     // −3…+3
+    int   jitter  = int(float(rawJit) * intensity);       // scale
+
+    dst[gy * 512 + gx] = tile[tid.x][tid.y] * scanMul;
+
+    uint jx = (uint)clamp(int(gx) + jitter, 0, 511);
+    dst[gy * 512 + jx] = tile[tid.x][tid.y];
 }

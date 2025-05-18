@@ -13,7 +13,7 @@ class FrameProcessor {
 
     init() {
         // graph.addFilter(GammaFilter(gamma: AppConstants.gamma))
-        // graph.addFilter(ChromaticAberrationFilter(intensity: AppConstants.chromaticIntensity))
+        graph.addFilter(ChromaticAberrationFilter(intensity: AppConstants.chromaticIntensity))
         // graph.addFilter(FFTFilter())
         graph.addFilter(MetalFFTFilter())
     }

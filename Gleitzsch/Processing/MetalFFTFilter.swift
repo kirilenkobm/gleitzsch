@@ -75,28 +75,73 @@ final class MetalFFTFilter: FloatRGBFilter {
 
         ensureBuffers(device: device, bytes: bytes)
 
-        func gpuTranspose(cmd: MTLCommandBuffer, src: MTLBuffer, dst: MTLBuffer) {
+        func gpuTranspose(cmd: MTLCommandBuffer, src: MTLBuffer, dst: MTLBuffer, channelNum: Int) {
             guard let enc = cmd.makeComputeCommandEncoder(),
                   let pipe = transposePipeline else { return }
+
             enc.setComputePipelineState(pipe)
             enc.setBuffer(src, offset: 0, index: 0)
             enc.setBuffer(dst, offset: 0, index: 1)
+
+            var seed: UInt32 = UInt32.random(in: 0...UInt32.max)   // frameSeed
+            // var vhsIntensity: Float = 1.0  // TODO: PARAM
+            var vhsIntensity: Float = if channelNum == 0 {
+                0.24
+            } else if channelNum == 1{
+                0.4
+            } else {
+                1.0
+            }
+            
+            enc.setBytes(&seed,         length: 4, index: 2)
+            enc.setBytes(&vhsIntensity, length: 4, index: 3)
+
             enc.dispatchThreadgroups(tgGrid, threadsPerThreadgroup: tgTile)
             enc.endEncoding()
         }
 
-        func process(_ channel: inout [Float]) {
+        func process(_ channel: inout [Float], _ channelNum: Int) {
             // ------- CPU → realBuffer --------------------------------------
             _ = channel.withUnsafeBytes { raw in
                 memcpy(realBuffer!.contents(), raw.baseAddress!, bytes)
             }
             memset(imagBuffer!.contents(), 0, bytes)
 
+            /* >>> VHS tear – one cyclic row shift <<< */
+            let tearIntensity: Float = 1.0   // 0…1 slider
+            if tearIntensity > 0 {
+                let width  = 512                                // N
+                let row    = Int.random(in: 0..<height)
+                var shift  = Int.random(in: -32...32)
+                shift = Int(Float(shift) * tearIntensity)       // scale by UI
+
+                if shift != 0 {
+                    let ptr = realBuffer!.contents()
+                        .assumingMemoryBound(to: Float.self)
+                    let rowPtr = ptr + row * width
+
+                    let absShift = abs(shift)
+                    let byteCnt  = (width - absShift) * MemoryLayout<Float>.size
+
+                    if shift > 0 {
+                        /* right: copy left → right, then wrap leftmost part */
+                        memmove(rowPtr + shift, rowPtr, byteCnt)
+                        memcpy(rowPtr, rowPtr + width - shift,
+                               absShift * MemoryLayout<Float>.size)
+                    } else {
+                        /* left: copy right → left, then wrap rightmost part */
+                        memmove(rowPtr, rowPtr - shift, byteCnt)
+                        memcpy(rowPtr + width + shift, rowPtr,
+                               absShift * MemoryLayout<Float>.size)
+                    }
+                }
+            }
+            
             // ------- GPU ----------------------------------------------------
             guard let cmd = ctx.commandQueue.makeCommandBuffer() else { return }
 
             // a) transpose: real → temp (теперь столбцы ⇒ строки)
-            gpuTranspose(cmd: cmd, src: realBuffer!, dst: tempBuffer!)
+            gpuTranspose(cmd: cmd, src: realBuffer!, dst: tempBuffer!, channelNum: channelNum)
 
             // b) FFT   (по строкам, но это бывшие столбцы)
             if let enc = cmd.makeComputeCommandEncoder() {
@@ -109,7 +154,7 @@ final class MetalFFTFilter: FloatRGBFilter {
 
             // c) Kill bands
             runKillBands(cmd,
-                         real: tempBuffer!, imag: imagBuffer!, rows: height)
+                         real: tempBuffer!, imag: imagBuffer!, rows: height, channelNum: channelNum)
 
             // d) iFFT  → outBuffer
             if let enc = cmd.makeComputeCommandEncoder() {
@@ -122,7 +167,7 @@ final class MetalFFTFilter: FloatRGBFilter {
             }
 
             // e) transpose back: outBuffer → realBuffer (снова row-major)
-            gpuTranspose(cmd: cmd, src: outBuffer!, dst: realBuffer!)
+            gpuTranspose(cmd: cmd, src: outBuffer!, dst: realBuffer!, channelNum: channelNum)
 
             cmd.commit()
             cmd.waitUntilCompleted()
@@ -133,9 +178,9 @@ final class MetalFFTFilter: FloatRGBFilter {
             }
         }
 
-        process(&r)
-        process(&g)
-        process(&b)
+        process(&r, 0)
+        process(&g, 1)
+        process(&b, 2)
 
         // ------- нормализация, чтобы не темнело ----------------------------
         r = r.normalizeToZeroOneSafe()
@@ -145,7 +190,7 @@ final class MetalFFTFilter: FloatRGBFilter {
 
     // MARK: -- Kill-bands kernel
     private func runKillBands(_ cmd: MTLCommandBuffer,
-                              real: MTLBuffer, imag: MTLBuffer, rows: Int)
+                              real: MTLBuffer, imag: MTLBuffer, rows: Int, channelNum: Int)
     {
         guard let pipe = killPipeline,
               let enc  = cmd.makeComputeCommandEncoder() else { return }
@@ -156,8 +201,21 @@ final class MetalFFTFilter: FloatRGBFilter {
 
         var cutLo = UInt32(Float(512) * lowRatio)
         var cutHi = UInt32(Float(512) * highRatio)
+//        
+//        var seed: UInt32 = UInt32.random(in: 0...UInt32.max)
+//        // TODO: param
+//        var vhsIntensity: Float = if channelNum == 0 {
+//            0.01
+//        } else if channelNum == 1 {
+//            0.01
+//        } else {
+//            0.01
+//        }
+        
         enc.setBytes(&cutLo, length: 4, index: 2)
         enc.setBytes(&cutHi, length: 4, index: 3)
+//        enc.setBytes(&seed,         length: 4, index: 4)
+//        enc.setBytes(&vhsIntensity, length: 4, index: 5)
 
         let tgLine  = MTLSize(width: 512, height: 1, depth: 1)
         let tgLines = MTLSize(width: rows, height: 1, depth: 1)
