@@ -36,5 +36,20 @@ extension Array where Element == Float {
         let range = max - min
         return self.map { ($0 - min) / range }
     }
+    
+    func normalizeToZeroOneSafe() -> [Float] {
+        guard let min = self.min(), let max = self.max(), max.isFinite, min.isFinite else {
+            return self.map { _ in 0 } // all black if totally broken
+        }
+        let range = max - min
+        if range <= .ulpOfOne { // min ≈ max
+            return self.map { _ in 0.5 } // mid-gray
+        }
+
+        return self.map {
+            let v = ($0 - min) / range
+            return v.isFinite ? v : 0
+        }
+    }
 }
 

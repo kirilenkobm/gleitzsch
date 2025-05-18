@@ -13,19 +13,35 @@ class ColorFFTScratch {
     let fftSize: Int
     let log2n: vDSP_Length
 
-    let rBuffer: FFT2DChannelBuffer
-    let gBuffer: FFT2DChannelBuffer
-    let bBuffer: FFT2DChannelBuffer
+    var rBuffer: FFT2DChannelBuffer
+    var gBuffer: FFT2DChannelBuffer
+    var bBuffer: FFT2DChannelBuffer
+
+    var tempRealR: [Float]
+    var tempImagR: [Float]
+
+    var tempRealG: [Float]
+    var tempImagG: [Float]
+
+    var tempRealB: [Float]
+    var tempImagB: [Float]
 
     init(width: Int, height: Int) {
         self.width = width
         self.height = height
-        self.fftSize = max(width, height) // ideally both are powers of 2
+        self.fftSize = max(width, height)
         self.log2n = vDSP_Length(log2(Float(fftSize)))
 
         rBuffer = FFT2DChannelBuffer(width: width, height: height)
         gBuffer = FFT2DChannelBuffer(width: width, height: height)
         bBuffer = FFT2DChannelBuffer(width: width, height: height)
+
+        tempRealR = [Float](repeating: 0, count: height)
+        tempImagR = [Float](repeating: 0, count: height)
+        tempRealG = [Float](repeating: 0, count: height)
+        tempImagG = [Float](repeating: 0, count: height)
+        tempRealB = [Float](repeating: 0, count: height)
+        tempImagB = [Float](repeating: 0, count: height)
     }
 }
 

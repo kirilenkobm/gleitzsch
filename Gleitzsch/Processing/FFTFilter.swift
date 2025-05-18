@@ -27,49 +27,73 @@ class FFTFilter: FloatRGBFilter {
 
         let normFactor = Float(height)
 
-        for (input, channel) in [(r, scratch.rBuffer), (g, scratch.gBuffer), (b, scratch.bBuffer)] {
-            // транспонируем: width×height → height×width
-            var transposed = [Float](repeating: 0, count: width * height)
-            vDSP_mtrans(input, 1, &transposed, 1, vDSP_Length(height), vDSP_Length(width))
+        // process r
+        processChannel(input: &r, buffer: &scratch.rBuffer,
+                       tempReal: &scratch.tempRealR, tempImag: &scratch.tempImagR,
+                       width: width, height: height,
+                       log2n: log2n, setup: setup, normFactor: normFactor)
 
-            var output = [Float](repeating: 0, count: width * height)
+        // process g
+        processChannel(input: &g, buffer: &scratch.gBuffer,
+                       tempReal: &scratch.tempRealG, tempImag: &scratch.tempImagG,
+                       width: width, height: height,
+                       log2n: log2n, setup: setup, normFactor: normFactor)
 
-            for row in 0..<width {
-                let rowStart = row * height
+        // process b
+        processChannel(input: &b, buffer: &scratch.bBuffer,
+                       tempReal: &scratch.tempRealB, tempImag: &scratch.tempImagB,
+                       width: width, height: height,
+                       log2n: log2n, setup: setup, normFactor: normFactor)
 
-                var tempReal = [Float](repeating: 0, count: height)
-                var tempImag = [Float](repeating: 0, count: height)
+        r = scratch.rBuffer.real.normalizeToZeroOneSafe()
+        g = scratch.gBuffer.real.normalizeToZeroOneSafe()
+        b = scratch.bBuffer.real.normalizeToZeroOneSafe()
+    }
 
-                for i in 0..<height {
-                    tempReal[i] = transposed[rowStart + i]
-                }
+    private func processChannel(
+        input: inout [Float],
+        buffer: inout FFT2DChannelBuffer,
+        tempReal: inout [Float],
+        tempImag: inout [Float],
+        width: Int,
+        height: Int,
+        log2n: vDSP_Length,
+        setup: FFTSetup,
+        normFactor: Float
+    ) {
+        var transposed = [Float](repeating: 0, count: width * height)
+        vDSP_mtrans(input, 1, &transposed, 1, vDSP_Length(height), vDSP_Length(width))
 
-                tempReal.withUnsafeMutableBufferPointer { real in
-                    tempImag.withUnsafeMutableBufferPointer { imag in
-                        var split = DSPSplitComplex(realp: real.baseAddress!, imagp: imag.baseAddress!)
-                        vDSP_fft_zip(setup, &split, 1, log2n, FFTDirection(FFT_FORWARD))
+        var output = [Float](repeating: 0, count: width * height)
 
-                        filter.apply(real: real.baseAddress!, imag: imag.baseAddress!, count: height)
+        for row in 0..<width {
+            let rowStart = row * height
 
-                        vDSP_fft_zip(setup, &split, 1, log2n, FFTDirection(FFT_INVERSE))
-                        vDSP_vsdiv(real.baseAddress!, 1, [normFactor], real.baseAddress!, 1, vDSP_Length(height))
+            for i in 0..<height {
+                tempReal[i] = transposed[rowStart + i]
+                tempImag[i] = 0
+            }
 
-                        for i in 0..<height {
-                            output[rowStart + i] = real[i]
-                        }
+            tempReal.withUnsafeMutableBufferPointer { real in
+                tempImag.withUnsafeMutableBufferPointer { imag in
+                    var split = DSPSplitComplex(realp: real.baseAddress!, imagp: imag.baseAddress!)
+                    vDSP_fft_zip(setup, &split, 1, log2n, FFTDirection(FFT_FORWARD))
+
+                    filter.apply(real: real.baseAddress!, imag: imag.baseAddress!, count: height)
+
+                    vDSP_fft_zip(setup, &split, 1, log2n, FFTDirection(FFT_INVERSE))
+                    vDSP_vsdiv(real.baseAddress!, 1, [normFactor], real.baseAddress!, 1, vDSP_Length(height))
+
+                    for i in 0..<height {
+                        output[rowStart + i] = real[i]
                     }
                 }
             }
-
-            // обратно: height×width → width×height
-            vDSP_mtrans(output, 1, &channel.real, 1, vDSP_Length(width), vDSP_Length(height))
         }
 
-        r = scratch.rBuffer.real.normalizeToZeroOne()
-        g = scratch.gBuffer.real.normalizeToZeroOne()
-        b = scratch.bBuffer.real.normalizeToZeroOne()
+        vDSP_mtrans(output, 1, &buffer.real, 1, vDSP_Length(width), vDSP_Length(height))
     }
-
+    
     deinit {
         if let setup = setup {
             vDSP_destroy_fftsetup(setup)

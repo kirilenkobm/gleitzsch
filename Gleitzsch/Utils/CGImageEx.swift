@@ -84,12 +84,13 @@ extension CGImage {
         return (r, g, b)
     }
     
+
     static func fromRGBFloatChannels(r: [Float], g: [Float], b: [Float], width: Int, height: Int) -> CGImage? {
         var rgba = [UInt8](repeating: 255, count: width * height * 4)
         for i in 0..<width * height {
-            rgba[i * 4 + 0] = UInt8(clamping: Int(r[i] * 255))
-            rgba[i * 4 + 1] = UInt8(clamping: Int(g[i] * 255))
-            rgba[i * 4 + 2] = UInt8(clamping: Int(b[i] * 255))
+            rgba[i * 4 + 0] = safe255(r[i])
+            rgba[i * 4 + 1] = safe255(g[i])
+            rgba[i * 4 + 2] = safe255(b[i])
             rgba[i * 4 + 3] = 255
         }
 
@@ -107,3 +108,9 @@ extension CGImage {
         return context?.makeImage()
     }
 }
+
+func safe255(_ x: Float) -> UInt8 {
+    if x.isNaN || x.isInfinite { return 0 }
+    return UInt8(clamping: Int(x * 255))
+}
+
