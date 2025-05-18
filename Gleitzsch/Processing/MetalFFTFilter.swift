@@ -33,38 +33,76 @@ class MetalFFTFilter: FloatRGBFilter {
         }
     }
 
-    func apply(r: inout [Float], g: inout [Float], b: inout [Float], width: Int, height: Int) {
+    func apply(r: inout [Float],
+               g: inout [Float],
+               b: inout [Float],
+               width: Int,
+               height: Int)
+    {
         guard let context = context,
               let fftPipeline = fftPipeline,
               let ifftPipeline = ifftPipeline else { return }
 
-        let channelSize = width * height * MemoryLayout<Float>.size
+        guard width == 512 else {
+            print("MetalFFTFilter only supports width = 512")
+            return
+        }
+
+        let device      = context.device
+        let count       = width * height
+        let byteCount   = count * MemoryLayout<Float>.size
+        let tgSize      = MTLSize(width: 512, height: 1, depth: 1)
+        let tgGroups    = MTLSize(width: height,  height: 1, depth: 1)
 
         func process(_ data: inout [Float]) {
-            guard let buffer = context.device.makeBuffer(bytes: &data, length: channelSize, options: []),
-                  let commandBuffer = context.commandQueue.makeCommandBuffer() else { return }
+            guard let commandBuffer = context.commandQueue.makeCommandBuffer() else { return }
 
-            let threadGroupSize = MTLSize(width: 1, height: 1, depth: 1)
-            let threadGroups = MTLSize(width: height, height: 1, depth: 1)  // запуск 512 потоков (по строкам)
-
-            if let encoder1 = commandBuffer.makeComputeCommandEncoder() {
-                encoder1.setComputePipelineState(fftPipeline)
-                encoder1.setBuffer(buffer, offset: 0, index: 0)
-                encoder1.dispatchThreadgroups(threadGroups, threadsPerThreadgroup: threadGroupSize)
-                encoder1.endEncoding()
+            // --- входной (real) буфер ---
+            guard let realBuffer = data.withUnsafeBytes({ raw -> MTLBuffer? in
+                guard let base = raw.baseAddress else { return nil }
+                return device.makeBuffer(bytes: base,
+                                         length: byteCount,
+                                         options: .storageModeShared)
+            }) else {
+                print("MetalFFTFilter: realBuffer creation failed")
+                return
             }
 
-            if let encoder2 = commandBuffer.makeComputeCommandEncoder() {
-                encoder2.setComputePipelineState(ifftPipeline)
-                encoder2.setBuffer(buffer, offset: 0, index: 0)
-                encoder2.dispatchThreadgroups(threadGroups, threadsPerThreadgroup: threadGroupSize)
-                encoder2.endEncoding()
+            // --- пустой imag + выходной буферы ---
+            guard let imagBuffer   = device.makeBuffer(length: byteCount,
+                                                       options: .storageModeShared),
+                  let outputBuffer = device.makeBuffer(length: byteCount,
+                                                       options: .storageModeShared) else {
+                print("MetalFFTFilter: imag/output buffer creation failed")
+                return
+            }
+            memset(imagBuffer.contents(), 0, byteCount)
+
+            // --- FFT ---
+            if let enc = commandBuffer.makeComputeCommandEncoder() {
+                enc.setComputePipelineState(fftPipeline)
+                enc.setBuffer(realBuffer, offset: 0, index: 0)
+                enc.setBuffer(imagBuffer, offset: 0, index: 1)
+                enc.dispatchThreadgroups(tgGroups, threadsPerThreadgroup: tgSize)
+                enc.endEncoding()
+            }
+
+            // --- iFFT ---
+            if let enc = commandBuffer.makeComputeCommandEncoder() {
+                enc.setComputePipelineState(ifftPipeline)
+                enc.setBuffer(realBuffer, offset: 0, index: 0)
+                enc.setBuffer(imagBuffer, offset: 0, index: 1)
+                enc.setBuffer(outputBuffer, offset: 0, index: 2)
+                enc.dispatchThreadgroups(tgGroups, threadsPerThreadgroup: tgSize)
+                enc.endEncoding()
             }
 
             commandBuffer.commit()
             commandBuffer.waitUntilCompleted()
 
-            memcpy(&data, buffer.contents(), channelSize)
+            // --- копируем результат обратно в массив ---
+            let outPtr = outputBuffer.contents().bindMemory(to: Float.self, capacity: count)
+            data = Array(UnsafeBufferPointer(start: outPtr, count: count))
         }
 
         process(&r)
