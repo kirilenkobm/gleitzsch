@@ -14,7 +14,7 @@ class FrameProcessor {
     init() {
         // Add image domain filters
         graph.addFilter(GammaFilter())
-        graph.addFilter(ChromaticAberration())
+        // graph.addFilter(ChromaticAberration())
 
         // Add 2D FFT/iFFT passthrough
         graph.addFilter(ColorFFTFilter()) // заменили FFTFilter

@@ -31,33 +31,48 @@ class ColorFFTFilter: ImageFilter {
         }
         guard let setup = setup else { return image }
 
-        let count = width * height
+        let count = width
         let normFactor = Float(count)
 
-
+        // Обрабатываем каждый канал
         for (channel, data) in [(scratch.rBuffer, r), (scratch.gBuffer, g), (scratch.bBuffer, b)] {
-            channel.real.withUnsafeMutableBufferPointer { realPtr in
-                channel.imag.withUnsafeMutableBufferPointer { imagPtr in
-                    data.withUnsafeBufferPointer { inputPtr in
-                        guard let real = realPtr.baseAddress,
-                              let imag = imagPtr.baseAddress,
-                              let input = inputPtr.baseAddress else { return }
+            // Транспонируем входной массив: width×height → height×width
+            var transposed = [Float](repeating: 0, count: width * height)
+            vDSP_mtrans(data, 1, &transposed, 1, vDSP_Length(height), vDSP_Length(width))
 
-                        real.update(from: input, count: count)
-                        imag.initialize(repeating: 0, count: count)
+            var output = [Float](repeating: 0, count: width * height)
 
-                        var split = DSPSplitComplex(realp: real, imagp: imag)
+            for row in 0..<width {
+                let rowStart = row * height
 
-                        vDSP_fft2d_zip(setup, &split, 1, vDSP_Stride(width), log2n, log2n, FFTDirection(FFT_FORWARD))
-                        
-                        // 💥 Glitch happens here
-                        filter.apply(real: split.realp, imag: split.imagp, count: count)
-                        
-                        vDSP_fft2d_zip(setup, &split, 1, vDSP_Stride(width), log2n, log2n, FFTDirection(FFT_INVERSE))
-                        vDSP_vsdiv(real, 1, [normFactor], real, 1, vDSP_Length(count))
+                // временные буферы
+                var tempReal = [Float](repeating: 0, count: height)
+                var tempImag = [Float](repeating: 0, count: height)
+
+                for i in 0..<height {
+                    tempReal[i] = transposed[rowStart + i]
+                    tempImag[i] = 0
+                }
+
+                tempReal.withUnsafeMutableBufferPointer { real in
+                    tempImag.withUnsafeMutableBufferPointer { imag in
+                        var split = DSPSplitComplex(realp: real.baseAddress!, imagp: imag.baseAddress!)
+                        vDSP_fft_zip(setup, &split, 1, log2n, FFTDirection(FFT_FORWARD))
+
+                        filter.apply(real: real.baseAddress!, imag: imag.baseAddress!, count: height)
+
+                        vDSP_fft_zip(setup, &split, 1, log2n, FFTDirection(FFT_INVERSE))
+                        vDSP_vsdiv(real.baseAddress!, 1, [normFactor], real.baseAddress!, 1, vDSP_Length(height))
+
+                        for i in 0..<height {
+                            output[rowStart + i] = real[i]
+                        }
                     }
                 }
             }
+
+            // Обратно транспонируем output: height×width → width×height
+            vDSP_mtrans(output, 1, &channel.real, 1, vDSP_Length(width), vDSP_Length(height))
         }
 
         let rOut = scratch.rBuffer.real.normalizeToZeroOne()
