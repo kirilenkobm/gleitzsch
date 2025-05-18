@@ -7,28 +7,38 @@
 
 import Accelerate
 
-class FFTScratch {
-    let real: UnsafeMutablePointer<Float>
-    let imag: UnsafeMutablePointer<Float>
-    let count: Int
+class ColorFFTScratch {
+    let width: Int
+    let height: Int
+    let fftSize: Int
+    let log2n: vDSP_Length
 
-    init(count: Int) {
-        self.count = count
-        self.real = .allocate(capacity: count)
-        self.imag = .allocate(capacity: count)
+    let rBuffer: FFT2DChannelBuffer
+    let gBuffer: FFT2DChannelBuffer
+    let bBuffer: FFT2DChannelBuffer
+
+    init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
+        self.fftSize = max(width, height) // ideally both are powers of 2
+        self.log2n = vDSP_Length(log2(Float(fftSize)))
+
+        rBuffer = FFT2DChannelBuffer(width: width, height: height)
+        gBuffer = FFT2DChannelBuffer(width: width, height: height)
+        bBuffer = FFT2DChannelBuffer(width: width, height: height)
     }
+}
 
-    deinit {
-        real.deallocate()
-        imag.deallocate()
-    }
+class FFT2DChannelBuffer {
+    let width: Int
+    let height: Int
+    var real: [Float]
+    var imag: [Float]
 
-    func load(from buffer: [Float]) {
-        real.assign(from: buffer, count: count)
-        imag.initialize(repeating: 0, count: count)
-    }
-
-    var splitComplex: DSPSplitComplex {
-        .init(realp: real, imagp: imag)
+    init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
+        self.real = .init(repeating: 0, count: width * height)
+        self.imag = .init(repeating: 0, count: width * height)
     }
 }

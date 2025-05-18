@@ -9,7 +9,7 @@ import Foundation
 import Combine
 import CoreImage
 
-class FramePipeline {
+final class FramePipeline {
     private let cameraManager = CameraManager()
     private let processor = FrameProcessor()
 
@@ -20,18 +20,41 @@ class FramePipeline {
 
     private var cancellables = Set<AnyCancellable>()
 
+    private var isProcessing = false
+    private var latestFrame: CGImage?
+
     func start() {
         cameraManager.$currentFrame
             .compactMap { $0 }
-            .receive(on: DispatchQueue.global(qos: .userInitiated))
-            .map { [processor] frame in
-                return processor.process(frame)
-            }
-            .sink { [weak self] processedFrame in
-                self?.frameSubject.send(processedFrame)
+            .sink { [weak self] frame in
+                guard let self = self else { return }
+
+                self.latestFrame = frame
+
+                guard !self.isProcessing else { return }
+
+                self.isProcessing = true
+                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                    guard let self = self else { return }
+
+                    while true {
+                        guard let frame = self.latestFrame else { break }
+                        self.latestFrame = nil
+
+                        let processed = self.processor.process(frame)
+                        DispatchQueue.main.async {
+                            self.frameSubject.send(processed)
+                        }
+
+                        // If another frame is waiting, continue
+                        if self.latestFrame == nil { break }
+                    }
+
+                    self.isProcessing = false
+                }
             }
             .store(in: &cancellables)
-        
+
         cameraManager.start()
     }
 }

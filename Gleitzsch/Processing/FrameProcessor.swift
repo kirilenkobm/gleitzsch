@@ -16,12 +16,13 @@ class FrameProcessor {
         graph.addFilter(GammaFilter())
         graph.addFilter(ChromaticAberration())
 
-        // Add FFT filter which wraps frequency domain filters
-        let fftFilter = FFTFilter(filters: [KillLowFrequencies()])
-        graph.addFilter(fftFilter)
+        // Add 2D FFT/iFFT passthrough
+        graph.addFilter(ColorFFTFilter()) // заменили FFTFilter
     }
 
     func process(_ image: CGImage) -> CGImage {
-        return graph.process(image)
+        let square = CGSize(width: 256, height: 256)
+        let resized = image.resized(to: square) ?? image
+        return graph.process(resized)
     }
 }
