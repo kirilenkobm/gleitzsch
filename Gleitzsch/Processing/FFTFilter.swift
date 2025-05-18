@@ -7,9 +7,10 @@
 import Accelerate
 import CoreImage
 
+
+
 class FFTFilter: FloatRGBFilter {
     private var scratch: ColorFFTScratch?
-    private var setup: FFTSetup?
     let filter = KillLowFrequencies()
 
     func apply(r: inout [Float], g: inout [Float], b: inout [Float], width: Int, height: Int) {
@@ -18,32 +19,47 @@ class FFTFilter: FloatRGBFilter {
         }
 
         guard let scratch = scratch else { return }
+        
+        let setupWrapper = FFTSetupStore.shared
 
         let log2n = scratch.log2n
-        if setup == nil {
-            setup = vDSP_create_fftsetup(log2n, FFTRadix(kFFTRadix2))
-        }
-        guard let setup = setup else { return }
-
         let normFactor = Float(height)
 
-        // process r
-        processChannel(input: &r, buffer: &scratch.rBuffer,
-                       tempReal: &scratch.tempRealR, tempImag: &scratch.tempImagR,
-                       width: width, height: height,
-                       log2n: log2n, setup: setup, normFactor: normFactor)
+        let group = DispatchGroup()
 
-        // process g
-        processChannel(input: &g, buffer: &scratch.gBuffer,
-                       tempReal: &scratch.tempRealG, tempImag: &scratch.tempImagG,
-                       width: width, height: height,
-                       log2n: log2n, setup: setup, normFactor: normFactor)
+        var rCopy = r
+        var gCopy = g
+        var bCopy = b
 
-        // process b
-        processChannel(input: &b, buffer: &scratch.bBuffer,
-                       tempReal: &scratch.tempRealB, tempImag: &scratch.tempImagB,
-                       width: width, height: height,
-                       log2n: log2n, setup: setup, normFactor: normFactor)
+    
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.processChannel(input: &rCopy, buffer: &scratch.rBuffer,
+                                tempReal: &scratch.tempRealR, tempImag: &scratch.tempImagR,
+                                width: width, height: height,
+                                log2n: log2n, setup: setupWrapper.setup, normFactor: normFactor)
+            group.leave()
+        }
+
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.processChannel(input: &gCopy, buffer: &scratch.gBuffer,
+                                tempReal: &scratch.tempRealG, tempImag: &scratch.tempImagG,
+                                width: width, height: height,
+                                log2n: log2n, setup: setupWrapper.setup, normFactor: normFactor)
+            group.leave()
+        }
+
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.processChannel(input: &bCopy, buffer: &scratch.bBuffer,
+                                tempReal: &scratch.tempRealB, tempImag: &scratch.tempImagB,
+                                width: width, height: height,
+                                log2n: log2n, setup: setupWrapper.setup, normFactor: normFactor)
+            group.leave()
+        }
+
+        group.wait()
 
         r = scratch.rBuffer.real.normalizeToZeroOneSafe()
         g = scratch.gBuffer.real.normalizeToZeroOneSafe()
@@ -93,10 +109,5 @@ class FFTFilter: FloatRGBFilter {
 
         vDSP_mtrans(output, 1, &buffer.real, 1, vDSP_Length(width), vDSP_Length(height))
     }
-    
-    deinit {
-        if let setup = setup {
-            vDSP_destroy_fftsetup(setup)
-        }
-    }
+
 }

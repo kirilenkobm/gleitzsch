@@ -18,6 +18,9 @@ class FrameProcessor {
     }
 
     func process(_ image: CGImage) -> CGImage {
+        let start = CFAbsoluteTimeGetCurrent()
+
+        
         let targetSize = AppConstants.targetSize
         let resized = image.resized(to: targetSize) ?? image
 
@@ -28,6 +31,12 @@ class FrameProcessor {
         graph.process(r: &r, g: &g, b: &b, width: width, height: height)
 
         let processed = CGImage.fromRGBFloatChannels(r: r, g: g, b: b, width: width, height: height)
-        return processed?.resized(to: CGSize(width: image.width, height: image.height)) ?? image
+        let result = processed?.resized(to: CGSize(width: image.width, height: image.height)) ?? image
+        
+        let end = CFAbsoluteTimeGetCurrent()
+        print("Frame processed in \((end - start) * 1000) ms")
+
+        
+        return result
     }
 }

@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import CoreImage
+import QuartzCore
 
 final class FramePipeline {
     private let cameraManager = CameraManager()
@@ -20,8 +21,13 @@ final class FramePipeline {
 
     private var cancellables = Set<AnyCancellable>()
 
-    private var isProcessing = false
-    private var latestFrame: CGImage?
+    private let processingQueue = DispatchQueue(label: "frame.processing", qos: .userInitiated)
+    private var frameBuffer = [CGImage?](repeating: nil, count: 2)
+    private var bufferIndex = 0
+    private let lock = NSLock()
+
+    private let throttleFPS: Double = 10.0
+    private var lastFrameTime: CFTimeInterval = 0
 
     func start() {
         cameraManager.$currentFrame
@@ -29,28 +35,33 @@ final class FramePipeline {
             .sink { [weak self] frame in
                 guard let self = self else { return }
 
-                self.latestFrame = frame
+                let now = CACurrentMediaTime()
+                if now - self.lastFrameTime < 1.0 / self.throttleFPS {
+                    return
+                }
+                self.lastFrameTime = now
 
-                guard !self.isProcessing else { return }
+                self.lock.lock()
+                self.frameBuffer[self.bufferIndex] = frame
+                let indexToProcess = self.bufferIndex
+                self.bufferIndex = (self.bufferIndex + 1) % self.frameBuffer.count
+                self.lock.unlock()
 
-                self.isProcessing = true
-                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self.processingQueue.async { [weak self] in
                     guard let self = self else { return }
 
-                    while true {
-                        guard let frame = self.latestFrame else { break }
-                        self.latestFrame = nil
-
-                        let processed = self.processor.process(frame)
-                        DispatchQueue.main.async {
-                            self.frameSubject.send(processed)
-                        }
-
-                        // If another frame is waiting, continue
-                        if self.latestFrame == nil { break }
+                    self.lock.lock()
+                    guard let frame = self.frameBuffer[indexToProcess] else {
+                        self.lock.unlock()
+                        return
                     }
+                    self.frameBuffer[indexToProcess] = nil
+                    self.lock.unlock()
 
-                    self.isProcessing = false
+                    let processed = self.processor.process(frame)
+                    DispatchQueue.main.async {
+                        self.frameSubject.send(processed)
+                    }
                 }
             }
             .store(in: &cancellables)
