@@ -9,53 +9,39 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @StateObject private var viewModel = CameraViewModel()
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
+        VStack {
+            if let frame = viewModel.currentFrame {
+                Image(decorative: frame, scale: 1.0)
+                    .resizable()
+                    .scaledToFill()
+                    .ignoresSafeArea()
+            } else {
+                Text("Camera is inactive")
             }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
-        }
-    }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            Button(action: {
+                viewModel.captureFrame()
+            }) {
+                Image(systemName: "camera.circle.fill")
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                    .foregroundColor(.white)
             }
         }
+        .onAppear {
+            viewModel.start()
+        }
     }
-}
-
-#Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+    
+    func rotation(for orientation: UIDeviceOrientation) -> Angle {
+        switch orientation {
+        case .landscapeLeft: return .degrees(90)
+        case .landscapeRight: return .degrees(-90)
+        case .portraitUpsideDown: return .degrees(180)
+        default: return .degrees(0)
+        }
+    }
 }

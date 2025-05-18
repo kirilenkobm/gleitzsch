@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F3A46D142DD9D325004B5D4F /* README.MD in Resources */ = {isa = PBXBuildFile; fileRef = F3A46D132DD9D319004B5D4F /* README.MD */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		F3A46CEB2DD90FE5004B5D4F /* Gleitzsch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Gleitzsch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F3A46D132DD9D319004B5D4F /* README.MD */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.MD; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -32,6 +37,7 @@
 		F3A46CE22DD90FE5004B5D4F = {
 			isa = PBXGroup;
 			children = (
+				F3A46D132DD9D319004B5D4F /* README.MD */,
 				F3A46CED2DD90FE5004B5D4F /* Gleitzsch */,
 				F3A46CEC2DD90FE5004B5D4F /* Products */,
 			);
@@ -109,6 +115,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F3A46D142DD9D325004B5D4F /* README.MD in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
