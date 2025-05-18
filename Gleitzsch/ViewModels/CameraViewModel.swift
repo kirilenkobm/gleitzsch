@@ -22,6 +22,8 @@ class CameraViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     func start() {
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        
         pipeline.framePublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] frame in
@@ -42,7 +44,18 @@ class CameraViewModel: ObservableObject {
 
     func captureFrame() {
         guard let image = currentFrame else { return }
-        let imageToSave = UIImage(cgImage: image, scale: 1.0, orientation: .right)
+
+        let orientation: UIImage.Orientation = {
+            switch deviceOrientation {
+            case .portrait: return .right
+            case .portraitUpsideDown: return .left
+            case .landscapeLeft: return .down
+            case .landscapeRight: return .up
+            default: return .right
+            }
+        }()
+
+        let imageToSave = UIImage(cgImage: image, scale: 1.0, orientation: orientation)
         UIImageWriteToSavedPhotosAlbum(imageToSave, nil, nil, nil)
     }
 }

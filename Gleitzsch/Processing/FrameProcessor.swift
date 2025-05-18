@@ -12,13 +12,13 @@ class FrameProcessor {
     private let graph = ProcessingGraph()
 
     init() {
-        graph.addFilter(GammaFilter(gamma: 4.0))
-        graph.addFilter(ChromaticAberrationFilter(intensity: 1.5))
+        graph.addFilter(GammaFilter(gamma: AppConstants.gamma))
+        graph.addFilter(ChromaticAberrationFilter(intensity: AppConstants.chromaticIntensity))
         graph.addFilter(FFTFilter())
     }
 
     func process(_ image: CGImage) -> CGImage {
-        let targetSize = CGSize(width: 512, height: 512)
+        let targetSize = AppConstants.targetSize
         let resized = image.resized(to: targetSize) ?? image
 
         var (r, g, b) = resized.toRGBFloatChannels()
