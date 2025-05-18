@@ -111,3 +111,37 @@ kernel void ifft1D_512(device float *realIn  [[buffer(0)]],
 
     output[row * N + tid] = real[tid] / float(N);
 }
+
+kernel void killBands_1D_512(device float *real   [[buffer(0)]],
+                             device float *imag   [[buffer(1)]],
+                             constant uint &cutLo [[buffer(2)]], // N_low
+                             constant uint &cutHi [[buffer(3)]], // N_high
+                             uint   gid           [[thread_position_in_grid]])
+{
+    uint freq = gid % N;
+    if ((freq == 0) ||
+        (freq >= cutLo && freq < N - cutHi)) {
+    } else {
+        real[gid] = imag[gid] = 0.0f;
+    }
+}
+
+
+kernel void transpose512(device float *src [[buffer(0)]],
+                         device float *dst [[buffer(1)]],
+                         uint2  tid [[thread_position_in_threadgroup]],
+                         uint2  gid [[threadgroup_position_in_grid]])
+{
+    // работаем плиткой 16×16 (ровно 512/32 = 16 групп)
+    constexpr uint TILE = 16;
+    threadgroup float tile[TILE][TILE+1];       // +1 чтобы избежать bank conflict
+
+    uint gx = gid.x * TILE + tid.x;             // глобальные координаты
+    uint gy = gid.y * TILE + tid.y;
+
+    tile[tid.y][tid.x] = src[gy * 512 + gx];    // читаем
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    gx = gid.y * TILE + tid.x;                  // меняем местами
+    gy = gid.x * TILE + tid.y;
+    dst[gy * 512 + gx] = tile[tid.x][tid.y];    // пишем
+}

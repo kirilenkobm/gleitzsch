@@ -12,7 +12,7 @@ class FrameProcessor {
     private let graph = ProcessingGraph()
 
     init() {
-        //graph.addFilter(GammaFilter(gamma: AppConstants.gamma))
+        // graph.addFilter(GammaFilter(gamma: AppConstants.gamma))
         // graph.addFilter(ChromaticAberrationFilter(intensity: AppConstants.chromaticIntensity))
         // graph.addFilter(FFTFilter())
         graph.addFilter(MetalFFTFilter())
