@@ -110,7 +110,9 @@ extension CGImage {
 }
 
 func safe255(_ x: Float) -> UInt8 {
-    if x.isNaN || x.isInfinite { return 0 }
-    return UInt8(clamping: Int(x * 255))
+    if !x.isFinite || x.isNaN || x.isInfinite {
+        return 0
+    }
+    let clamped = max(0.0, min(1.0, x)) // clamp to [0...1]
+    return UInt8(clamping: Int(clamped * 255))
 }
-
