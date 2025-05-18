@@ -52,6 +52,23 @@ CIImage (oriented) → gamma correction
 
 Frames are displayed using `.scaledToFill()` and `CGImage` is rotated using `.oriented(.right)` before conversion.
 
+All filters are modular and added in `Processing/FrameProcessor.swift`.
+- Gamma and Chromatic Aberration filters operate in image domain.
+- FFTFilter wraps frequency-domain filters (e.g. KillLowFrequencies).
+- Frequency-domain filters use Accelerate's vDSP and operate on DSPSplitComplex (real/imag).
+
+## 🧠 Filter Architecture
+
+There are two types of filters:
+
+- `ImageFilter` — operate on `CGImage` directly (e.g. gamma, chromatic aberration)
+- `FrequencyDomainFilter` — operate on `DSPSplitComplex` buffers (e.g. FFT-based glitch)
+
+The `FFTFilter` bridges both domains:
+- Converts image to grayscale float array
+- Applies FFT (via Accelerate/vDSP)
+- Applies `FrequencyDomainFilter`s in-place
+- (TODO: iFFT + image reconstruction)
 
 ## 🧪 Device Orientation
 
@@ -80,6 +97,3 @@ Gleitzsch/
 - [ ] Add intensity/config sliders
 - [ ] Save processed video
 - [ ] AppClip or LivePhoto support
-
----
-

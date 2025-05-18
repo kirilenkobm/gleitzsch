@@ -9,8 +9,19 @@ import Foundation
 import CoreImage
 
 class FrameProcessor {
+    private let graph = ProcessingGraph()
+
+    init() {
+        // Add image domain filters
+        graph.addFilter(GammaFilter())
+        graph.addFilter(ChromaticAberration())
+
+        // Add FFT filter which wraps frequency domain filters
+        let fftFilter = FFTFilter(filters: [KillLowFrequencies()])
+        graph.addFilter(fftFilter)
+    }
+
     func process(_ image: CGImage) -> CGImage {
-        // Пока что без обработки, просто passthrough
-        return image
+        return graph.process(image)
     }
 }

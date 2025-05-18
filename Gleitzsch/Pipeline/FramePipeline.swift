@@ -23,9 +23,12 @@ class FramePipeline {
     func start() {
         cameraManager.$currentFrame
             .compactMap { $0 }
-            .sink { [weak self] frame in
-                // Пока фильтров нет, просто прокидываем
-                self?.frameSubject.send(frame)
+            .receive(on: DispatchQueue.global(qos: .userInitiated))
+            .map { [processor] frame in
+                return processor.process(frame)
+            }
+            .sink { [weak self] processedFrame in
+                self?.frameSubject.send(processedFrame)
             }
             .store(in: &cancellables)
         
