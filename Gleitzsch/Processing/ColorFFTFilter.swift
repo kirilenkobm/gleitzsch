@@ -10,6 +10,7 @@ import CoreImage
 class ColorFFTFilter: ImageFilter {
     private var scratch: ColorFFTScratch?
     private var setup: FFTSetup?
+    let filter = KillLowFrequencies()
 
     func apply(to image: CGImage) -> CGImage {
         let width = image.width
@@ -33,6 +34,7 @@ class ColorFFTFilter: ImageFilter {
         let count = width * height
         let normFactor = Float(count)
 
+
         for (channel, data) in [(scratch.rBuffer, r), (scratch.gBuffer, g), (scratch.bBuffer, b)] {
             channel.real.withUnsafeMutableBufferPointer { realPtr in
                 channel.imag.withUnsafeMutableBufferPointer { imagPtr in
@@ -41,14 +43,15 @@ class ColorFFTFilter: ImageFilter {
                               let imag = imagPtr.baseAddress,
                               let input = inputPtr.baseAddress else { return }
 
-                        real.assign(from: input, count: count)
+                        real.update(from: input, count: count)
                         imag.initialize(repeating: 0, count: count)
 
                         var split = DSPSplitComplex(realp: real, imagp: imag)
 
                         vDSP_fft2d_zip(setup, &split, 1, vDSP_Stride(width), log2n, log2n, FFTDirection(FFT_FORWARD))
                         
-                        // filter can be inserted here
+                        // 💥 Glitch happens here
+                        filter.apply(real: split.realp, imag: split.imagp, count: count)
                         
                         vDSP_fft2d_zip(setup, &split, 1, vDSP_Stride(width), log2n, log2n, FFTDirection(FFT_INVERSE))
                         vDSP_vsdiv(real, 1, [normFactor], real, 1, vDSP_Length(count))

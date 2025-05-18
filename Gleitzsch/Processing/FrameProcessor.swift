@@ -21,8 +21,16 @@ class FrameProcessor {
     }
 
     func process(_ image: CGImage) -> CGImage {
-        let square = CGSize(width: 256, height: 256)
-        let resized = image.resized(to: square) ?? image
-        return graph.process(resized)
+        // Step 1: ресайз до квадрата 512×512
+        let targetSize = CGSize(width: 512, height: 512)
+        let resized = image.resized(to: targetSize) ?? image
+
+        // Step 2: прогоняем через фильтры
+        let processed = graph.process(resized)
+
+        // Step 3: ресайз обратно к оригиналу
+        let restored = processed.resized(to: CGSize(width: image.width, height: image.height)) ?? processed
+
+        return restored
     }
 }

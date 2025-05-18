@@ -14,10 +14,11 @@ struct ContentView: View {
     var body: some View {
         VStack {
             if let frame = viewModel.currentFrame {
-                Image(decorative: frame, scale: 1.0)
+                Image(decorative: frame, scale: 1.0, orientation: .up)
                     .resizable()
-                    .scaledToFill()
-                    .ignoresSafeArea()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black)
             } else {
                 Text("Camera is inactive")
             }
